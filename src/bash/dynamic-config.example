@@ -1,0 +1,10 @@
+Host *
+  LocalForward 5900 localhost:5901
+  ExitOnForwardFailure yes
+  ServerAliveCountMax 6
+  ServerAliveInterval 10
+  ControlMaster auto
+  ControlPath ~/.ssh/sockets/%r@%h:%p
+  ControlPersist 30
+  PreferredAuthentications publickey
+  IdentityFile ~/.ssh/id_rsa
