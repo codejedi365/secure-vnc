@@ -1,0 +1,274 @@
+#!/bin/bash
+# FILE: ./.vnc-connect
+
+#----------------------------------#
+#     Secure VNC Connect Agent     #
+#                                  #
+# Author: codejedi365              #
+# Date:   14 Oct 2020              #
+#----------------------------------#
+# DESCRIPTION:
+# Interactive prompt
+# shows available usernames, asks for remote ip address, tells you the port
+# interactive prompt by default
+# additionally any other parameters will modify individual parameters
+# could be included as Environment variables specified as
+###--->
+
+SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd )";   # source code location
+WRK_DIR="$PWD";                                             # current location user is
+[ ! -w "$WRK_DIR" ] && WRK_DIR=$HOME
+
+
+# Default Vars
+[ -z "$DEFAULT_CONNECT_TYPE" ] && DEFAULT_CONNECT_TYPE="REMOTE";
+[ -z "$DEFAULT_VNC_PORT_LOCAL" ] && DEFAULT_VNC_PORT_LOCAL=15901;
+[ -z "$DEFAULT_VNC_PORT" ] && DEFAULT_VNC_PORT=5901;
+MODE_LAZY=false
+MODE_QUIET=false
+MODE_TEST=false
+
+usage() {
+    echo "Usage: $0 [-hlfqTRL] [-a <address>] [-p <port>] [-u <user>]" 1>&2; exit 1;
+}
+
+
+### MOST OF THESE VARs in help() will be blank!!!!!! & usage exits?!
+## USE subshells?
+help() {
+#    $(. .ssh-connect);
+    echo ""
+    echo "S-VNC Connection Agent"
+    echo "----------------------"
+    echo "Interactive initializer for an encrypted VNC session to device"
+    echo ""
+    usage | echo;
+    echo "Available Options: "
+    echo "  -h  Help"
+    echo "  -a  [REQUIRED] Hostname or IPv4 address"
+    echo "  -p  Remote port to connect to"
+    echo "  -l  Lazy mode or non-interactive mode and if variable is missing it fails or uses default"
+    echo "  -u  username"
+    echo "  -f  Activate Port Forwarding mode"
+    echo "         default: ON"
+	echo "  -q  Execute quietly"
+	echo "  -T  Activate Test Mode. Builds command but does not execute connection"
+	echo "  -R  Establish remote ip based connection"
+	echo "  -L  Establish local hostname connection"
+    echo ""
+}
+print_banner() {
+	echo "";
+    echo "========================";
+    echo "|  Secure VNC Connect  |";
+    echo "========================";
+	echo "";
+}
+
+interact() {
+
+	if [ -z "$CONNECT_TYPE" ]; then
+		if [ "$MODE_LAZY" = false ]; then
+			local valid=false
+			while [ "$valid" = false ]; do
+				read -e -p "Connection type (REMOTE/LOCAL) [$DEFAULT_CONNECT_TYPE]: " CONN_TYPE;
+				if [ -n "$CONN_TYPE" -a [ -n "$(grep -i -E '^(remote|R|local|L)$' <(echo "$CONN_TYPE"))"] ]; then
+					valid=true
+					[ -n "$(grep -i -E '^(R|remote)$' <(echo "$CONN_TYPE"))" ] && CONN_TYPE="REMOTE";
+					[ -n "$(grep -i -E '^(L|local)$' <(echo "$CONN_TYPE"))" ] && CONN_TYPE="LOCAL";
+				fi
+			done
+		fi
+		if [ -n "$CONN_TYPE" ]; then
+			CONNECT_TYPE="$CONN_TYPE"
+		else
+			CONNECT_TYPE="$DEFAULT_CONNECT_TYPE"
+		fi
+		echo "CONNECT_TYPE=$CONNECT_TYPE"
+	fi
+
+    if [ -z "$VNC_PORT_LOCAL" ]; then
+        if [ "$MODE_LAZY" = false ]; then
+            read -e -p "VNC Client-Side Port [$DEFAULT_VNC_PORT_LOCAL]: " lport;
+        fi
+
+        if [ -z "$(grep -E '^6[0-5]{2}[1-3][1-5]|([1-5]?[0-9]{4})|([0-9]{1,4})$' <(echo "$lport"))" ]; then        # Check for number less than 65535
+            lport="$DEFAULT_VNC_PORT_LOCAL"
+        fi
+        VNC_PORT_LOCAL="$lport"
+        echo "VNC_PORT_LOCAL=$VNC_PORT_LOCAL";
+    fi
+
+    if [ -z "$VNC_PORT" ]; then
+        if [ "$MODE_LAZY" = false ]; then
+            read -e -p "Remote VNC Port [$DEFAULT_VNC_PORT]: " Rport;
+        fi
+
+        if [ -z "$(grep -E '^6[0-5]{2}[1-3][1-5]|([1-5]?[0-9]{4})|([0-9]{1,4})$' <(echo "$Rport"))" ]; then        # Check for number less than 65535
+            Rport="$DEFAULT_VNC_PORT"
+        fi
+        VNC_PORT="$Rport"
+        echo "VNC_PORT=$VNC_PORT";
+	fi
+}
+
+main() {
+	if [ "$MODE_QUIET" = false ]; then
+		print_banner
+	fi
+	
+	interact
+
+	# Call SSH Method in Test Mode ==> creates interaction for all vars
+	# VARS: USERNAME, REMOTE_ADDRESS, SSH_PORT, IDENTITY_KEY
+	case "$CONNECT_TYPE" in
+		REMOTE)
+			. "$SRC_DIR/ssh-remote" -T -q "${args2pass# }"
+			;;
+		LOCAL)
+			. "$SRC_DIR/ssh-local" -T -q "${args2pass# }"
+			;;
+		*)
+			echo "ERROR: '$CONNECT_TYPE' is not valid. Exiting...";
+			exit 1;
+			;;
+	esac
+
+## BUILD Dynamic Configuration file on-the-fly
+#local REMOTE_CMD="/bin/bash -c \"vncserver 2>&1;\""
+    local CTRL_PATH="~/.ssh/sockets/%r@%h:%p"
+    local CONFIG_OPTS="Host *
+  LocalForward $VNC_PORT_LOCAL localhost:$VNC_PORT
+  ExitOnForwardFailure yes
+  ServerAliveCountMax 6
+  ServerAliveInterval 10
+  ControlMaster auto
+  ControlPath $CTRL_PATH
+  ControlPersist 30
+  PreferredAuthentications publickey
+  IdentityFile $IDENTITY_KEY";
+
+    echo "$CONFIG_OPTS" > "$WRK_DIR"/dynamic-config;
+
+    ## Remove dynamic-config file on exit of script
+    trap 'rm "$WRK_DIR/dynamic-config"; exit $?' EXIT
+
+    ## Build file to capture output
+    outputfile="$(mktemp -u)";         # creates a temporary filename (no file)
+    exec 3<>$outputfile;
+
+    
+    # Set up Secure Tunnel Port-Forwarding
+    # Remote code execution: run cmd to start remote desktop server process
+    # TEMPLATE: ssh -fT -L 5900:localhost:6901 cj730@<address>:<ssh_port> <cmd>
+
+    ## Build control master connection (main tunnel)
+    ssh -fTN -F "$WRK_DIR"/dynamic-config -p $SSH_PORT "$USERNAME@$REMOTE_ADDRESS"
+    ## USER INPUT:  ENTER Private Key PIN ##
+
+    # Action Success check
+    if [ -n "$(ssh -F "$WRK_DIR"/dynamic-config -O check "$USERNAME@$REMOTE_ADDRESS" 2>&1 | grep -E "Master running (pid=[0-9]+)" )" ]; then
+        echo "Control Master creation failed.";
+    else
+        echo "ssh $USERNAME@$REMOTE_ADDRESS -p $SSH_PORT -i $IDENTITY_KEY";
+        echo "SSH Connection established.";
+        echo "TUNNEL: 127.0.0.1[$VNC_PORT_LOCAL] >>>> $REMOTE_ADDRESS:$VNC_PORT";
+    fi
+
+    ## Start VNC server on remote host
+    ## vnc outputs to stderr (fd 2) therefore redirect to stdout to grab in variable
+    ssh -T -o 'ControlMaster=auto' -o "ControlPath=$CTRL_PATH" -p "$SSH_PORT" "$USERNAME@$REMOTE_ADDRESS" '/bin/bash -c "vncserver 2>&1"' 1>&3
+    rCMD_output="$(cat $outputfile)"; rm "$outputfile";
+    # Grep output for hostname plus display number... shows action success
+    if [ -z "$(echo "$rCMD_output"| grep -E "$rHOSTNAME:([0-9]+)")" ]; then
+        echo "Error: VNC Server startup attempt failed. Exiting..."; exit 1;
+    else
+        echo "vncserver started on remote";
+    fi
+
+    # Grep output for hostname and display number (verify :1?... could change port forwarding if desired)
+
+    echo "...";
+    echo "open vnc://localhost:$VNC_PORT_LOCAL";
+    echo "# ScreenSharing.app 127.0.0.1[$VNC_PORT_LOCAL] >>>> TUNNEL";
+    open "vnc://localhost:$VNC_PORT_LOCAL";
+    #      if [ -z "$(netstat -tln | grep "$VNC_PORT_LOCAL" )" ]; then              # alternative if
+    if [ -z "$(lsof -t -i @localhost:"$VNC_PORT_LOCAL" -sTCP:listen )" ]; then       #gets PID of listening process
+        echo "Error: Secure tunnel persistence failed. Exiting..."; exit 1;
+    fi
+
+    echo "Enter the VNC Access password in the popup.";
+    echo "";
+    #
+    echo "Enjoy your VNC Desktop session!";
+    echo "Once you exit, the secure tunnel will collapse in 30 seconds." && echo "";
+
+# Print process id of master to be able to modify channel
+    # NEED to send kill desktop command to clean up on exit
+
+    # NEED to handle adjusting tunnel to change port forwarding when there is another user with a vnc desktop open
+# dont open a new server if one is already active for current user
+
+}
+
+
+
+# Process line args
+processArgs() {
+	local OPTIND;
+	while getopts ":a:u:p:hlfqTRL" o; do               # process & check command line options
+		case "${o}" in
+			a)
+				[ -z "${OPTARG}" ] && usage; 
+				args2pass="$args2pass -${o} ${OPTARG}"
+				;;
+			u)
+				[ -z "${OPTARG}" ] && usage;
+				args2pass="$args2pass -${o} ${OPTARG}"
+				;;
+			p)
+				[ -z "${OPTARG}" ] && usage;
+				args2pass="$args2pass -${o} ${OPTARG}"
+				;;
+			h)
+				help && exit 0;
+				;;
+			l)
+				[ -n "${OPTARG}" ] && usage;
+				args2pass="$args2pass -${o}"
+				MODE_LAZY=true
+				;;
+			f)
+				[ -n "${OPTARG}" ] && usage;
+				args2pass="$args2pass -${o}"
+				;;
+			q)
+				[ -n "${OPTARG}" ] && usage;
+				MODE_QUIET=true
+				;;
+			T)
+				[ -n "${OPTARG}" ] && usage;
+				args2pass="$args2pass -${o}"
+				;;
+			R)
+				[ -n "${OPTARG}" ] && usage;
+				CONNECT_TYPE="REMOTE"
+				;;
+			L)
+				[ -n "${OPTARG}" ] && usage;
+				CONNECT_TYPE="LOCAL"
+				;;
+			*)
+				usage
+				;;
+		esac
+	done
+	shift $((OPTIND-1));
+}
+
+# ---------------------------
+# Autorun - Ingest line args
+# ---------------------------
+processArgs "$@";
+
+main                    # Run Main Loop
