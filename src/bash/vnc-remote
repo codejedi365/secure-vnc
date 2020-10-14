@@ -1,0 +1,114 @@
+#!/bin/bash
+# FILE: vnc-local.sh
+
+#----------------------------------#
+#     Secure Remote VNC Agent      #
+#                                  #
+# Author: codejedi365              #
+# Date:   14 Oct 2020              #
+#----------------------------------#
+
+SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd )";   # source code location
+# Default Vars
+MODE_LAZY=false
+MODE_QUIET=false
+
+usage() {
+    echo "Usage: $0 [-hlfqT] [-a <address>] [-p <port>] [-u <user>]" 1>&2; exit 1;
+}
+help() {
+    echo ""
+    echo "S-VNC Remote Connection Agent"
+    echo "-----------------------------"
+    echo "Interactive initializer for an encrypted VNC session to remote IP device"
+    echo ""
+    usage | echo;
+    echo "Available Options: "
+    echo "  -h  Help"
+    echo "  -a  Destination IPv4 address"
+    echo "  -p  Remote port to connect to"
+    echo "  -l  Lazy mode or non-interactive mode and if variable is missing it fails or uses default"
+    echo "  -u  username"
+    echo "  -f  Activate Port Forwarding mode"
+    echo "         default: OFF"
+	echo "  -q  Execute quietly"
+	echo "  -T  Activate Test Mode. Builds command but does not execute connection"
+    echo ""
+    exit 0;
+}
+print_banner() {
+	echo "";
+    echo "===========================";
+    echo "| Secure VNC Remote Login |";
+    echo "===========================";
+	echo "";
+}
+
+main() {
+	if [ "$MODE_QUIET" = false ]; then
+		print_banner
+	fi
+
+	if [ -f "$SRC_DIR/.vnc-connect" ]; then
+		. "$SRC_DIR/.vnc-connect" -R -q "${args2pass# }"
+		if [ "$?" == 1 ]; then
+			exit 1
+		fi
+	else 
+		echo "FILE ./.vnc-connect NOT FOUND. Exiting...";
+		exit 1
+	fi
+}
+
+# Process line args
+processArgs() {
+	local OPTIND;
+	while getopts ":a:u:p:hlfqT" o; do               # process & check command line options
+		case "${o}" in
+			a)
+				[ -z "${OPTARG}" ] && usage; 
+				args2pass="$args2pass -${o} ${OPTARG}"
+				;;
+			u)
+				[ -z "${OPTARG}" ] && usage;
+				args2pass="$args2pass -${o} ${OPTARG}"
+				;;
+			p)
+				[ -z "${OPTARG}" ] && usage;
+				args2pass="$args2pass -${o} ${OPTARG}"
+				;;
+			h)
+				help
+				;;
+			l)
+				[ -n "${OPTARG}" ] && usage;
+				args2pass="$args2pass -${o}"
+				MODE_LAZY=true
+				;;
+			f)
+				[ -n "${OPTARG}" ] && usage;
+				args2pass="$args2pass -${o}"
+				;;
+			T)
+				[ -n "${OPTARG}" ] && usage;
+				args2pass="$args2pass -${o}"
+				;;
+			q)
+				[ -n "${OPTARG}" ] && usage;
+				MODE_QUIET=true
+				;;
+			*)
+				usage
+				;;
+		esac
+	done
+	shift $((OPTIND-1));
+}
+
+# ---------------------------
+# Autorun - Ingest line args
+# ---------------------------
+processArgs "$@";
+
+
+main                    # Run Main Loop
