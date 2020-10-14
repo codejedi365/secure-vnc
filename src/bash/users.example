@@ -1,0 +1,5 @@
+USERS=( \
+  "padawan" \
+  "jedi" \
+  "master" \
+);
