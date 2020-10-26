@@ -196,7 +196,10 @@ Host *
     ## Build file to capture output
     outputfile="$(mktemp -u)";         # creates a temporary filename (no file)
     exec 3<>$outputfile;
-
+    onExit_rm_tmpfile() {
+        rm "$outputfile";
+    }
+    trap_sigexit_fns+=('onExit_rm_tmpfile');     # Register Exit Handler
 
     ## Start VNC server on remote host
     ##  - Remote code execution: run cmd to start remote desktop server process
@@ -297,6 +300,8 @@ Host *
     VNC_PORT=$((VNC_PORT+VNC_DISPLAY_NUMBER));
     VNC_PORT_LOCAL=$((VNC_PORT_LOCAL+VNC_DISPLAY_NUMBER));
 
+    # Close file descriptor & delete is handled by SIGEXIT trap
+    exec 3>&-;
 
     ## ------------------------------------ ##
     ## Set up Secure Tunnel Port-Forwarding ##
@@ -333,12 +338,6 @@ Host *
     #
     echo "Enjoy your VNC Desktop session!";
     echo "Once you exit, the secure tunnel will collapse in 30 seconds." && echo "";
-
-# Print process id of master to be able to modify channel
-    # NEED to send kill desktop command to clean up on exit
-
-    # NEED to handle adjusting tunnel to change port forwarding when there is another user with a vnc desktop open
-# dont open a new server if one is already active for current user
 
 }
 
