@@ -145,6 +145,12 @@ main() {
 
     local VNC_DISPLAY_NUMBER=1
     echo "VNC DISPLAY = ${VNC_DISPLAY_NUMBER}" && echo;
+
+    ## Initialize SSH-Agent in environment, add private key once!
+    eval "$(ssh-agent -s)" 1>/dev/null;
+    ssh-add "$IDENTITY_KEY";            ## User Inputs their Private Key PIN (only once!) ##
+    echo;
+
 ## BUILD Dynamic Configuration file on-the-fly
     local CTRL_PATH="~/.ssh/sockets/%r@%h:%p"
     local CONFIG_OPTS="\
