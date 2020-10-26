@@ -28,6 +28,22 @@ MODE_LAZY=false
 MODE_QUIET=false
 MODE_TEST=false
 
+## ARRAY of registered functions to run on SIGEXIT
+##   register a function by appending the name to the array 
+##   ex. trap_sigexit_fns+=('fn_name') 
+trap_sigexit_fns=()
+
+sigexit_handlers() {
+    for fn in "${trap_sigexit_fns[@]}"; do
+        ($fn);
+        [ $? != 0 ] && echo 1>&2 "ERROR: exit handler '$fn' failed."
+    done
+}
+
+## Set TRAP! Ensures exit_code is the exit code of the program not a handler's exitcode.
+trap "RC=$?; sigexit_handlers; (exit $RC);" EXIT
+
+
 usage() {
     echo "Usage: $0 [-hlfqTRL] [-a <address>] [-p <port>] [-u <user>]" 1>&2; exit 1;
 }
@@ -151,6 +167,13 @@ main() {
     ssh-add "$IDENTITY_KEY";            ## User Inputs their Private Key PIN (only once!) ##
     echo;
 
+    ## CURRENTLY Not desired to kill agent on script exit, likely only on script failure
+    # onExit_killsshagent() {          ## Remove SSH Agent on exit of script
+    #     ssh-add -D;                  # Delete ssh keys
+    #     eval `ssh-agent -k 2>&1 1>/dev/null`;
+    # }
+    # trap_sigexit_fns+=('onExit_killsshagent');     # Register Exit Handler
+
 ## BUILD Dynamic Configuration file on-the-fly
     local CTRL_PATH="~/.ssh/sockets/%r@%h:%p"
     local CONFIG_OPTS="\
@@ -168,7 +191,10 @@ Host *
     echo "$CONFIG_OPTS" > "$WRK_DIR"/dynamic-config;
 
     ## Remove dynamic-config file on exit of script
-    trap 'rm "$WRK_DIR/dynamic-config"; exit $?' EXIT
+    onExit_rm_DynamicSSHConfig() {
+        rm "$WRK_DIR/dynamic-config";
+    }
+    trap_sigexit_fns+=('onExit_rm_DynamicSSHConfig');     # Register Exit Handler
 
     ## Build file to capture output
     outputfile="$(mktemp -u)";         # creates a temporary filename (no file)
