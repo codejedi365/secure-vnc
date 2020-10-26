@@ -200,10 +200,24 @@ Host *
     outputfile="$(mktemp -u)";         # creates a temporary filename (no file)
     exec 3<>$outputfile;
 
-    
-    # Set up Secure Tunnel Port-Forwarding
-    # Remote code execution: run cmd to start remote desktop server process
-    # TEMPLATE: ssh -fT -L 5900:localhost:6901 cj730@<address>:<ssh_port> <cmd>
+
+    ## Start VNC server on remote host
+    ##  - Remote code execution: run cmd to start remote desktop server process
+    ##    TEMPLATE: ssh -fT <username>@<address> -p <ssh_port> <cmd>
+    ##  - vnc outputs to stderr (fd 2) therefore redirect to stdout to grab in variable
+
+    # ssh -T -o 'ControlMaster=auto' -o "ControlPath=$CTRL_PATH" -p "$SSH_PORT" "$USERNAME@$REMOTE_ADDRESS" '/bin/bash -c "vncserver 2>&1"' 1>&3
+    # rCMD_output="$(cat $outputfile)"; rm "$outputfile";
+
+    # ## Grep output for hostname plus display number... shows action success
+    # if [ -z "$(echo "$rCMD_output"| grep -E "$rHOSTNAME:([0-9]+)")" ]; then
+    #     echo "Error: VNC Server startup attempt failed. Exiting..."; exit 1;
+    # else
+    #     ## Grep output for hostname and display number (verify :1?... could change port forwarding if desired)
+        
+        
+    #     echo "vncserver started on remote";
+    # fi
     VNC_PORT=$((VNC_PORT+VNC_DISPLAY_NUMBER))
     VNC_PORT_LOCAL=$((VNC_PORT_LOCAL+VNC_DISPLAY_NUMBER))
 
@@ -227,19 +241,6 @@ Host *
         echo "SSH Connection established.";
         echo "TUNNEL: 127.0.0.1:$VNC_PORT_LOCAL >>>> $REMOTE_ADDRESS:$VNC_PORT";
     fi
-
-    ## Start VNC server on remote host
-    ## vnc outputs to stderr (fd 2) therefore redirect to stdout to grab in variable
-    ssh -T -o 'ControlMaster=auto' -o "ControlPath=$CTRL_PATH" -p "$SSH_PORT" "$USERNAME@$REMOTE_ADDRESS" '/bin/bash -c "vncserver 2>&1"' 1>&3
-    rCMD_output="$(cat $outputfile)"; rm "$outputfile";
-    # Grep output for hostname plus display number... shows action success
-    if [ -z "$(echo "$rCMD_output"| grep -E "$rHOSTNAME:([0-9]+)")" ]; then
-        echo "Error: VNC Server startup attempt failed. Exiting..."; exit 1;
-    else
-        echo "vncserver started on remote";
-    fi
-
-    # Grep output for hostname and display number (verify :1?... could change port forwarding if desired)
 
     echo "...";
     echo "open vnc://localhost:$VNC_PORT_LOCAL";
