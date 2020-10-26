@@ -5,7 +5,7 @@
 #     Secure VNC Connect Agent     #
 #                                  #
 # Author: codejedi365              #
-# Date:   14 Oct 2020              #
+# Date:   26 Oct 2020              #
 #----------------------------------#
 # DESCRIPTION:
 # Interactive prompt
@@ -135,10 +135,9 @@ main() {
 	esac
 
 ## BUILD Dynamic Configuration file on-the-fly
-#local REMOTE_CMD="/bin/bash -c \"vncserver 2>&1;\""
     local CTRL_PATH="~/.ssh/sockets/%r@%h:%p"
-    local CONFIG_OPTS="Host *
-  LocalForward $VNC_PORT_LOCAL localhost:$VNC_PORT
+    local CONFIG_OPTS="\
+Host *
   ExitOnForwardFailure yes
   ServerAliveCountMax 6
   ServerAliveInterval 10
@@ -146,7 +145,8 @@ main() {
   ControlPath $CTRL_PATH
   ControlPersist 30
   PreferredAuthentications publickey
-  IdentityFile $IDENTITY_KEY";
+  IdentityFile $IDENTITY_KEY
+";
 
     echo "$CONFIG_OPTS" > "$WRK_DIR"/dynamic-config;
 
@@ -163,8 +163,11 @@ main() {
     # TEMPLATE: ssh -fT -L 5900:localhost:6901 cj730@<address>:<ssh_port> <cmd>
 
     ## Build control master connection (main tunnel)
+    OPT_LOCAL_FORWARD="LocalForward $VNC_PORT_LOCAL localhost:$VNC_PORT";
+    CONFIG_OPTS="$CONFIG_OPTS  $OPT_LOCAL_FORWARD";
+    echo "$CONFIG_OPTS" > "$WRK_DIR"/dynamic-config;
     ssh -fTN -F "$WRK_DIR"/dynamic-config -p $SSH_PORT "$USERNAME@$REMOTE_ADDRESS"
-    ## USER INPUT:  ENTER Private Key PIN ##
+    tunnelPID=$!
 
     # Action Success check
     if [ -n "$(ssh -F "$WRK_DIR"/dynamic-config -O check "$USERNAME@$REMOTE_ADDRESS" 2>&1 | grep -E "Master running (pid=[0-9]+)" )" ]; then
