@@ -330,7 +330,7 @@ Host *
     local programopener;
     case "${unameOut}" in
         Linux*)
-            programopener='xdg-open'
+            programopener='vncviewer'
             echo "# [VNC App] 127.0.0.1:$VNC_PORT_LOCAL >>>> TUNNEL";
             ;;
         Darwin*)

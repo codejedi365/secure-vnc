@@ -60,12 +60,6 @@ $ VERSION="$(curl -Lo- "https://api.github.com/repos/codejedi365/secure-vnc/rele
 ## Download latest version
 $ curl -L -o "secure-vnc.tar.gz" "https://github.com/codejedi365/secure-vnc/archive/${VERSION}.tar.gz"
 
-## Verify Download Checksum for v1.0 [9b3b685]
-$ sha256sum ./secure-vnc.tar.gz | \
-    grep "87a30cd19fd3d22237b2ff09c805deae8ef5f1343d282cd553c227892fa7002c" && \
-    echo "CHECKSUM VERIFIED" || \
-    echo "CHECKSUM FAILED";
-
 ## Unpack Download
 $ tar --chroot -xvt ./secure-vnc.tar.gz
 
