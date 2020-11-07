@@ -145,7 +145,7 @@ main() {
 	interact
 
 	# Call SSH Method in Test Mode ==> creates interaction for all vars
-	# VARS: USERNAME, REMOTE_ADDRESS, SSH_PORT, IDENTITY_KEY
+	# VARS: SSH_USERNAME, REMOTE_ADDRESS, SSH_PORT, IDENTITY_KEY
 	case "$CONNECT_TYPE" in
 		REMOTE)
 			. "$SRC_DIR/ssh-remote" -T -q "${args2pass# }"
@@ -209,7 +209,7 @@ Host *
     local VNC_DISPLAY_NUMBER=0
 
     echo -e "Sending query to vncserver...\n";
-    ssh -TF "$WRK_DIR/dynamic-config" -p "$SSH_PORT" "$USERNAME@$REMOTE_ADDRESS" '/bin/bash -c "vncserver -list -cleanstale 2>&1"' 1>&3
+    ssh -TF "$WRK_DIR/dynamic-config" -p "$SSH_PORT" "$SSH_USERNAME@$REMOTE_ADDRESS" '/bin/bash -c "vncserver -list -cleanstale 2>&1"' 1>&3
     RC=$? && [ $RC != 0 ] && exit $RC;
     local rCMD_output="$(cat $outputfile)"; echo > $outputfile;
 
@@ -275,13 +275,13 @@ Host *
         done
     else
         echo -e "No existing displays found.\n";
-        echo "Initializing new display for $USERNAME...";
+        echo "Initializing new display for $SSH_USERNAME...";
     fi
 
 
     ## Either fall-through logic or No displays previously found, initiate a desktop
     if [ $VNC_DISPLAY_NUMBER == 0 ]; then  
-        ssh -TF "$WRK_DIR/dynamic-config" -p "$SSH_PORT" "$USERNAME@$REMOTE_ADDRESS" '/bin/bash -c "vncserver 2>&1; echo "===="; vncserver -list 2>&1"' 1>&3
+        ssh -TF "$WRK_DIR/dynamic-config" -p "$SSH_PORT" "$SSH_USERNAME@$REMOTE_ADDRESS" '/bin/bash -c "vncserver 2>&1; echo "===="; vncserver -list 2>&1"' 1>&3
         RC=$? && [ $RC != 0 ] && exit $RC;
         rCMD_output="$(cat $outputfile)"; echo > $outputfile;
         display_num=$(echo "$rCMD_output" | grep "desktop" | sed -E 's/.*desktop at :([0-9]+) on.*/\1/');
@@ -311,15 +311,15 @@ Host *
     OPT_LOCAL_FORWARD="LocalForward $VNC_PORT_LOCAL localhost:$VNC_PORT";
     CONFIG_OPTS="$CONFIG_OPTS  $OPT_LOCAL_FORWARD";
     echo "$CONFIG_OPTS" > "$WRK_DIR"/dynamic-config;
-    ssh -fTN -F "$WRK_DIR"/dynamic-config -p $SSH_PORT "$USERNAME@$REMOTE_ADDRESS"
+    ssh -fTN -F "$WRK_DIR"/dynamic-config -p $SSH_PORT "$SSH_USERNAME@$REMOTE_ADDRESS"
     tunnelPID=$!
 
     # Action Success check
-    if [ -n "$(ssh -F "$WRK_DIR"/dynamic-config -O check "$USERNAME@$REMOTE_ADDRESS" 2>&1 | grep -E "Master running (pid=[0-9]+)" )" ]; then
+    if [ -n "$(ssh -F "$WRK_DIR"/dynamic-config -O check "$SSH_USERNAME@$REMOTE_ADDRESS" 2>&1 | grep -E "Master running (pid=[0-9]+)" )" ]; then
         echo 1>&2 "Control Master creation failed.";
     else
         echo "Using this generated SSH config:" && cat "${WRK_DIR}/dynamic-config" && echo
-        echo "ssh $USERNAME@$REMOTE_ADDRESS -p $SSH_PORT -i $IDENTITY_KEY";
+        echo "ssh $SSH_USERNAME@$REMOTE_ADDRESS -p $SSH_PORT -i $IDENTITY_KEY";
         echo "SSH Connection established.";
         echo "TUNNEL: 127.0.0.1:$VNC_PORT_LOCAL >>>> $REMOTE_ADDRESS:$VNC_PORT";
     fi

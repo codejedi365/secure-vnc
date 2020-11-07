@@ -5,7 +5,7 @@
 #      SSH Connect Syntax          #
 #                                  #
 # Author: codejedi365              #
-# Date:   14 Oct 2020              #
+# Date:   07 Nov 2020              #
 #----------------------------------#
 
 # Interactive prompt
@@ -26,6 +26,8 @@ MODE_LAZY=false
 MODE_PORTFWD=false
 MODE_QUIET=false
 MODE_TEST=false
+# PREVENT ENV POLLUTION
+unset SSH_USERNAME SSH_PORT #IDENTITY_KEY #REMOTE_ADDRESS
 
 usage() {
     echo "Usage: $0 [-hlfqT] [-a <address>] [-p <port>] [-u <user>]" 1>&2; exit 1;
@@ -84,22 +86,22 @@ check_user() {
 }
 
 interact() {
-	if [ -z "$USERNAME" ]; then
+	if [ -z "$SSH_USERNAME" ]; then
 		if [ "$MODE_LAZY" = false ]; then
 			print_users
 			read -e -p "Username on remote [$DEFAULT_USER]: " user;
 		fi
 		if [ -n "$user" -a "$(check_user "$user")" = true ]; then
-			USERNAME="$user"
+			SSH_USERNAME="$user"
 		else
-			USERNAME="$DEFAULT_USER"
+			SSH_USERNAME="$DEFAULT_USER"
 		fi
-		echo "USERNAME=$USERNAME"
+		echo "SSH_USERNAME=$SSH_USERNAME"
 	fi
 
-    if [ -f "$HOME/.ssh/$USERNAME" ]; then
-        IDENTITY_KEY="$HOME/.ssh/$USERNAME";
-        echo "Found identity key: ~/.ssh/$USERNAME"
+    if [ -f "$HOME/.ssh/$SSH_USERNAME" ]; then
+        IDENTITY_KEY="$HOME/.ssh/$SSH_USERNAME";
+        echo "Found identity key: ~/.ssh/$SSH_USERNAME"
         local confirmed=false
         while [ "$confirmed" = false ]; do
             read -e -p "Do you want to use this key pair (Y/n)? " response;
@@ -107,10 +109,10 @@ interact() {
                 if [ -n "$(echo $response | grep -i -E '^(N|NO|NOPE)$')" ]; then
                     IDENTITY_KEY=""     # reset key
                 else
-                    echo "CONFIRMED: Loading identity key ~/.ssh/$USERNAME"
+                    echo "CONFIRMED: Loading identity key ~/.ssh/$SSH_USERNAME"
                 fi
-                confirmed=true 
-            else 
+                confirmed=true;
+            else
                 echo 1>&2 "Invalid response received. Try again."
             fi
         done
@@ -167,7 +169,7 @@ interact() {
 }
 
 # Required env vars
-#  USERNAME
+#  SSH_USERNAME
 #  REMOTE_ADDRESS
 #  SSH_PORT
 #  IDENTITY_KEY
@@ -185,12 +187,12 @@ main() {
 	interact
 
 	if [ "$MODE_TEST" = true ]; then
-		[ "$MODE_QUIET" = false ] && (echo "PREVIEW: ssh $USERNAME@$REMOTE_ADDRESS -p $SSH_PORT");
+		[ "$MODE_QUIET" = false ] && (echo "PREVIEW: ssh $SSH_USERNAME@$REMOTE_ADDRESS -p $SSH_PORT");
 		return 0;
 	fi
 	# ssh <username> @ <address> -p <port> -i <identity>
-	echo ""; echo "ssh $USERNAME@$REMOTE_ADDRESS -p $SSH_PORT -i $IDENTITY_KEY"; echo "connecting...";
-	ssh "$USERNAME@$REMOTE_ADDRESS" -p "$SSH_PORT" -i "$IDENTITY_KEY"
+	echo ""; echo "ssh $SSH_USERNAME@$REMOTE_ADDRESS -p $SSH_PORT -i $IDENTITY_KEY"; echo "connecting...";
+	ssh "$SSH_USERNAME@$REMOTE_ADDRESS" -p "$SSH_PORT" -i "$IDENTITY_KEY"
 	
 	
 	if [ "$?" == 1 ]; then
@@ -217,7 +219,7 @@ processArgs() {
 			u)
 				found="$(check_user "${OPTARG}")";
 				if [ "$found" = true ]; then
-					USERNAME="${OPTARG}";
+					SSH_USERNAME="${OPTARG}";
 				else
 					echo "Username given is not valid.";
 					usage
