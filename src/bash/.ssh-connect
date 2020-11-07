@@ -125,8 +125,8 @@ interact() {
 
         while [ "$valid" = false ] && [ "$count" -lt "3" ]; do
             read -e -p "Enter private key filename: ~/.ssh/$ " ikey;
-            if [ -f "$ikey" ]; then  # handle absolute path provided
-                IDENTITY_KEY="$ikey"
+            if [ ! -d "$(dirname "$HOME/.ssh/$ikey")" ] && [ -f "$ikey" ]; then         # handle absolute path provided
+                IDENTITY_KEY="$ikey";
             elif [ -z "$ikey" ]; then
                 continue;
             else
