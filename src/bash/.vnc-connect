@@ -5,7 +5,7 @@
 #     Secure VNC Connect Agent     #
 #                                  #
 # Author: codejedi365              #
-# Date:   26 Oct 2020              #
+# Date:   07 Nov 2020              #
 #----------------------------------#
 # DESCRIPTION:
 # Interactive prompt
@@ -145,7 +145,7 @@ main() {
 	interact
 
 	# Call SSH Method in Test Mode ==> creates interaction for all vars
-	# VARS: USERNAME, REMOTE_ADDRESS, SSH_PORT, IDENTITY_KEY
+	# VARS: SSH_USERNAME, REMOTE_ADDRESS, SSH_PORT, IDENTITY_KEY
 	case "$CONNECT_TYPE" in
 		REMOTE)
 			. "$SRC_DIR/ssh-remote" -T -q "${args2pass# }"
@@ -209,7 +209,7 @@ Host *
     local VNC_DISPLAY_NUMBER=0
 
     echo -e "Sending query to vncserver...\n";
-    ssh -TF "$WRK_DIR/dynamic-config" -p "$SSH_PORT" "$USERNAME@$REMOTE_ADDRESS" '/bin/bash -c "vncserver -list -cleanstale 2>&1"' 1>&3
+    ssh -TF "$WRK_DIR/dynamic-config" -p "$SSH_PORT" "$SSH_USERNAME@$REMOTE_ADDRESS" '/bin/bash -c "vncserver -list -cleanstale 2>&1"' 1>&3
     RC=$? && [ $RC != 0 ] && exit $RC;
     local rCMD_output="$(cat $outputfile)"; echo > $outputfile;
 
@@ -275,13 +275,13 @@ Host *
         done
     else
         echo -e "No existing displays found.\n";
-        echo "Initializing new display for $USERNAME...";
+        echo "Initializing new display for $SSH_USERNAME...";
     fi
 
 
     ## Either fall-through logic or No displays previously found, initiate a desktop
     if [ $VNC_DISPLAY_NUMBER == 0 ]; then  
-        ssh -TF "$WRK_DIR/dynamic-config" -p "$SSH_PORT" "$USERNAME@$REMOTE_ADDRESS" '/bin/bash -c "vncserver 2>&1; echo "===="; vncserver -list 2>&1"' 1>&3
+        ssh -TF "$WRK_DIR/dynamic-config" -p "$SSH_PORT" "$SSH_USERNAME@$REMOTE_ADDRESS" '/bin/bash -c "vncserver 2>&1; echo "===="; vncserver -list 2>&1"' 1>&3
         RC=$? && [ $RC != 0 ] && exit $RC;
         rCMD_output="$(cat $outputfile)"; echo > $outputfile;
         display_num=$(echo "$rCMD_output" | grep "desktop" | sed -E 's/.*desktop at :([0-9]+) on.*/\1/');
@@ -311,23 +311,47 @@ Host *
     OPT_LOCAL_FORWARD="LocalForward $VNC_PORT_LOCAL localhost:$VNC_PORT";
     CONFIG_OPTS="$CONFIG_OPTS  $OPT_LOCAL_FORWARD";
     echo "$CONFIG_OPTS" > "$WRK_DIR"/dynamic-config;
-    ssh -fTN -F "$WRK_DIR"/dynamic-config -p $SSH_PORT "$USERNAME@$REMOTE_ADDRESS"
+    ssh -fTN -F "$WRK_DIR"/dynamic-config -p $SSH_PORT "$SSH_USERNAME@$REMOTE_ADDRESS"
     tunnelPID=$!
 
     # Action Success check
-    if [ -n "$(ssh -F "$WRK_DIR"/dynamic-config -O check "$USERNAME@$REMOTE_ADDRESS" 2>&1 | grep -E "Master running (pid=[0-9]+)" )" ]; then
+    if [ -n "$(ssh -F "$WRK_DIR"/dynamic-config -O check "$SSH_USERNAME@$REMOTE_ADDRESS" 2>&1 | grep -E "Master running (pid=[0-9]+)" )" ]; then
         echo 1>&2 "Control Master creation failed.";
     else
         echo "Using this generated SSH config:" && cat "${WRK_DIR}/dynamic-config" && echo
-        echo "ssh $USERNAME@$REMOTE_ADDRESS -p $SSH_PORT -i $IDENTITY_KEY";
+        echo "ssh $SSH_USERNAME@$REMOTE_ADDRESS -p $SSH_PORT -i $IDENTITY_KEY";
         echo "SSH Connection established.";
         echo "TUNNEL: 127.0.0.1:$VNC_PORT_LOCAL >>>> $REMOTE_ADDRESS:$VNC_PORT";
     fi
 
     echo "...";
-    echo "open vnc://localhost:$VNC_PORT_LOCAL";
-    echo "# ScreenSharing.app 127.0.0.1:$VNC_PORT_LOCAL >>>> TUNNEL";
-    open "vnc://localhost:$VNC_PORT_LOCAL";
+    local VNC_URL="vnc://localhost:$VNC_PORT_LOCAL";
+    local unameOut="$(uname -s)";
+    local programopener;
+    case "${unameOut}" in
+        Linux*)
+            programopener='vncviewer';
+            VNC_URL="localhost:$VNC_PORT_LOCAL";
+            echo "# [VNC App] 127.0.0.1:$VNC_PORT_LOCAL >>>> TUNNEL";
+            ;;
+        Darwin*)
+            programopener='open';
+            echo "# ScreenSharing.app 127.0.0.1:$VNC_PORT_LOCAL >>>> TUNNEL";
+            ;;
+        CYGWIN*)
+            errortxt="CYGWIN is not currently supported. You will have to open ";
+            errortxt+="your VNC client mannually to $VNC_URL ";
+            errortxt+="before the SSH Tunnel collapses.";
+            echo 1>&2 "$errortxt" && exit -1;
+            ;;
+        *)
+            echo 1>&2 "ERROR: Unsupported system type ($unameOut) detected. Quiting..." && exit -1;
+            ;;
+    esac
+    echo "${programopener} ${VNC_URL}";
+    bash -c "${programopener} ${VNC_URL}" 2>/dev/null;
+    [ $? != 0 ] && echo 1>&2 "There was an error opening your default VNC program." && exit -2;
+
     #      if [ -z "$(netstat -tln | grep "$VNC_PORT_LOCAL" )" ]; then              # alternative if
     if [ -z "$(lsof -t -i @localhost:"$VNC_PORT_LOCAL" -sTCP:listen )" ]; then       #gets PID of listening process
         echo "Error: Secure tunnel persistence failed. Exiting..."; exit 1;
