@@ -118,12 +118,17 @@ interact() {
         done
     fi
     if [ -z "$IDENTITY_KEY" ]; then
-        local valid=false
-        local count=0
+        local valid=false;
+        local count=0;
+        local cwd="$PWD";
+        [ -d "$HOME/.ssh/" ] && builtin cd "$HOME/.ssh/";
+
         while [ "$valid" = false ] && [ "$count" -lt "3" ]; do
             read -e -p "Enter private key filename: ~/.ssh/$ " ikey;
             if [ -f "$ikey" ]; then  # handle absolute path provided
                 IDENTITY_KEY="$ikey"
+            elif [ -z "$ikey" ]; then
+                continue;
             else
                 # find realpath, follow symbolic links and resolve relative paths
                 ikey="$(cd "$(dirname "$HOME/.ssh/$ikey")"; pwd -P)/$(basename "$ikey")"
@@ -142,6 +147,7 @@ interact() {
         if [ "$valid" = false ]; then
             echo "Maximum number of attempts exceeded, no identity found" && exit 1;
         fi
+        builtin cd "$cwd";
     fi
 
 	if [ -z "$SSH_PORT" ]; then
