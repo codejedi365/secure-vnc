@@ -124,24 +124,31 @@ interact() {
         [ -d "$HOME/.ssh/" ] && builtin cd "$HOME/.ssh/";
 
         while [ "$valid" = false ] && [ "$count" -lt "3" ]; do
+            builtin bind "set expand-tilde on" &>/dev/null;
             read -e -p "Enter private key filename: ~/.ssh/$ " ikey;
-            if [ ! -d "$(dirname "$HOME/.ssh/$ikey")" ] && [ -f "$ikey" ]; then         # handle absolute path provided
-                IDENTITY_KEY="$ikey";
-            elif [ -z "$ikey" ]; then
+            ikey="${ikey/#\~/$HOME}"
+            if [ -z "$ikey" ]; then                                                       # no text entered
                 continue;
-            else
+
+            elif [ -d "$(dirname "$HOME/.ssh/$ikey")" ]; then                           # valid relative path provided
                 # find realpath, follow symbolic links and resolve relative paths
                 ikey="$(cd "$(dirname "$HOME/.ssh/$ikey")"; pwd -P)/$(basename "$ikey")"
-                if [ -f "$ikey" ]; then
-                    IDENTITY_KEY="$ikey";
-                else
-                    count=$(($count + 1));  # FAILED +1
-                fi
-            fi
 
-            if [ -n "$IDENTITY_KEY" ]; then
-                valid=true;
+            elif [ $(cd "$(dirname "$ikey")" &>/dev/null; echo $?) == 0 ]; then         # handle absolute path provided
+                # resolve to physical path
+                ikey="$(cd "$(dirname "$ikey")"; pwd -P)/$(basename "$ikey")";
+
+            else
+                ikey="" # reset value
+            fi
+            ## WILL NOT accept env variables unless a tab complete is used at the end of the line. Bash will replace with tab.
+
+            if [ -f "$ikey" ]; then
                 echo "Identity accepted.";
+                IDENTITY_KEY="$ikey";
+                valid=true;
+            else
+                count=$(($count + 1));  # FAILED +1
             fi
         done
         if [ "$valid" = false ]; then
