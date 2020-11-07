@@ -38,13 +38,13 @@ These scripts are placed in the proper folder for which technology they require.
 #### Local Host
 - SSH (public key usage)
 - [OPTIONAL] `users` file in current working directory\*
-- Default application for opening vnc url's `vnc://localhost` configured.\*\*
+- Default application for opening vnc uri's `localhost:[port]` configured.\*\*
 
     Notes:
     
     \*File follows bash syntax for defining a USERS variable which is an array of usernames.  This helps remind the user which usernames are defined on the remote host per project.
     
-    \*\*Secure-vnc uses `open` or `xdg-open` for Mac OSX and Linux respectfully to spawn the default vnc application using a vnc protocol URL.  An error will occur if there are no default applications installed for the VNC protocol. Mac OSX comes with `Screen Sharing.app` by default.  I recommend installing `tigervnc-viewer` for Linux.
+    \*\*Secure-vnc uses `open` or `vncviewer` for Mac OSX and Linux respectfully to spawn the default vnc application using a vnc protocol URI.  An error will occur if there are no default applications installed for the VNC protocol. Mac OSX comes with `Screen Sharing.app` by default.  I recommend installing `tigervnc-viewer` for Linux.
 
 #### Remote Host
 - Pre-configured user's `~/.ssh/authorized_keys` file with matching SSH `*.pub` key
