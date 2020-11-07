@@ -20,7 +20,7 @@ Prefer not to have VNC automatically running on boot?  No problem!  This script 
 Secure-vnc prompts the user for input of parameters specific to creating a basic SSH TTY if the parameters are not already provided via command line switches or environmental variables.  Once all parameters are filled, it prints out what the command syntax is and then uses it unless the `-T` option is used.  This option sets the script into dry-run mode to output the necessary syntax and establish environmental variables.
 
 ### VNC
-Secure-vnc prompts the user for input of parameters for creating a connection if the parameters are not already provided via command line switches or environmental variables.  A dynamically generated SSH configuration is generated from the prompts in the current working directory.  Before building a tunnel, the script connects over SSH to query the system if any VNC displays are currently active `(TigerVNC) vncserver -list -cleanstale`.  
+Secure-vnc prompts the user for input of parameters for creating a connection if the parameters are not already provided via command line switches or environmental variables.  A dynamically generated SSH configuration is generated from the prompts in the current working directory.  Before building a tunnel, the script connects over SSH to query the system if any VNC displays are currently active `vncserver -list -cleanstale`.  At this time, this command is specific to TigerVNC only.
 
 If none are found, secure-vnc spawns a new display, detects the port & display number from the output, and configures a new ssh tunnel for the specific port.  Lastly, it  requests your local computer to open the default application that supports a vnc URL.
 
@@ -34,17 +34,17 @@ Lastly, if more than one display is found, secure-vnc prompts the user for a cho
 - `*-remote` scripts do not support domain name lookups and remote IP is required.
 
 ## PRE-REQUISTES
-These scripts are placed in the proper folder for which technology they require.  Currently supports bash execution on Mac OSX for SSH & VNC capabilities. Only SSH usage for local Linux hosts.
+These scripts are placed in the proper folder for which technology they require.  Currently supports bash execution on Mac OSX & Linux for SSH & VNC capabilities.   This does NOT include WSL 2 or CYGWIN at this time, support unknown.
 #### Local Host
 - SSH (public key usage)
 - [OPTIONAL] `users` file in current working directory\*
-- `open vnc://localhost` (Mac OSX support only)\*\*
+- Default application for opening vnc url's `vnc://localhost` configured.\*\*
 
     Notes:
     
     \*File follows bash syntax for defining a USERS variable which is an array of usernames.  This helps remind the user which usernames are defined on the remote host per project.
     
-    \*\*Mac OSX uses `open` command to spawn default applications, vnc is the url so MacOSX uses `Screen Sharing.app` by default.
+    \*\*Secure-vnc uses `open` or `xdg-open` for Mac OSX and Linux respectfully to spawn the default vnc application using a vnc protocol URL.  An error will occur if there are no default applications installed for the VNC protocol. Mac OSX comes with `Screen Sharing.app` by default.  I recommend installing `tigervnc-viewer` for Linux.
 
 #### Remote Host
 - Pre-configured user's `~/.ssh/authorized_keys` file with matching SSH `*.pub` key
@@ -107,10 +107,9 @@ If any of the following variables are defined when the script is run then the sc
 - DEFAULT_VNC_PORT ---------- remote base port to start at when requesting vnc connections
 
 ## FUTURE GOALS & COMING SOON
-1. Linux vncviewer support
-2. **[HELP REQUESTED]** Port over to Python & handle cross-platform to include Windows
-3. Plugin architecture for other vncserver applications
-4. Management ability to kill other displays (this will loose any unsaved work)
+1. **[HELP REQUESTED]** Port over to Python & handle cross-platform to include Windows
+2. Plugin architecture for other vncserver applications
+3. Management ability to kill other displays (this will loose any unsaved work)
 
 ## CONTRIBUTE
 

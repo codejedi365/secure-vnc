@@ -5,7 +5,7 @@
 #     Secure VNC Connect Agent     #
 #                                  #
 # Author: codejedi365              #
-# Date:   26 Oct 2020              #
+# Date:   07 Nov 2020              #
 #----------------------------------#
 # DESCRIPTION:
 # Interactive prompt
@@ -325,9 +325,32 @@ Host *
     fi
 
     echo "...";
-    echo "open vnc://localhost:$VNC_PORT_LOCAL";
-    echo "# ScreenSharing.app 127.0.0.1:$VNC_PORT_LOCAL >>>> TUNNEL";
-    open "vnc://localhost:$VNC_PORT_LOCAL";
+    VNC_URL="vnc://localhost:$VNC_PORT_LOCAL";
+    local unameOut="$(uname -s)";
+    local programopener;
+    case "${unameOut}" in
+        Linux*)
+            programopener='xdg-open'
+            echo "# [VNC App] 127.0.0.1:$VNC_PORT_LOCAL >>>> TUNNEL";
+            ;;
+        Darwin*)
+            programopener='open'
+            echo "# ScreenSharing.app 127.0.0.1:$VNC_PORT_LOCAL >>>> TUNNEL";
+            ;;
+        CYGWIN*)
+            errortxt="CYGWIN is not currently supported. You will have to open ";
+            errortxt+="your VNC client mannually to $VNC_URL ";
+            errortxt+="before the SSH Tunnel collapses.";
+            echo 1>&2 "$errortxt" && exit -1;
+            ;;
+        *)
+            echo 1>&2 "ERROR: Unsupported system type ($unameOut) detected. Quiting..." && exit -1;
+            ;;
+    esac
+    echo "${programopener} ${VNC_URL}";
+    bash -c "${programopener} ${VNC_URL}" 2>/dev/null;
+    [ $? != 0 ] && echo 1>&2 "There was an error opening your default VNC program." && exit -2;
+
     #      if [ -z "$(netstat -tln | grep "$VNC_PORT_LOCAL" )" ]; then              # alternative if
     if [ -z "$(lsof -t -i @localhost:"$VNC_PORT_LOCAL" -sTCP:listen )" ]; then       #gets PID of listening process
         echo "Error: Secure tunnel persistence failed. Exiting..."; exit 1;
