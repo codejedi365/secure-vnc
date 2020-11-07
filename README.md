@@ -64,10 +64,10 @@ $ curl -L -o "secure-vnc.tar.gz" "https://github.com/codejedi365/secure-vnc/arch
 $ tar --chroot -xvt ./secure-vnc.tar.gz
 
 ## Enable SSH scripts for use
-$ chmod +x $PROJECT_DIR/bash/ssh-* 
+$ chmod u+x $PROJECT_DIR/bash/ssh-* 
 
 ## Enable VNC scripts for use
-$ chmod +x $PROJECT_DIR/bash/vnc-*
+$ chmod u+x $PROJECT_DIR/bash/vnc-*
 ```
 
 ## USE
