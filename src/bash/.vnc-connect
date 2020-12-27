@@ -5,7 +5,7 @@
 #     Secure VNC Connect Agent     #
 #                                  #
 # Author: codejedi365              #
-# Date:   07 Nov 2020              #
+# Date:   27 Dec 2020              #
 #----------------------------------#
 # DESCRIPTION:
 # Interactive prompt
@@ -192,6 +192,27 @@ Host *
         rm "$WRK_DIR/dynamic-config";
     }
     trap_sigexit_fns+=('onExit_rm_DynamicSSHConfig');     # Register Exit Handler
+
+    ## Confirm Authority to Connect
+    echo "All settings validated. Compiled connection command is:";
+    echo -e "> ssh $SSH_USERNAME@$REMOTE_ADDRESS -p $SSH_PORT -i $IDENTITY_KEY\n";
+    local confirmed=false
+    while [ "$confirmed" = false ]; do
+        read -e -p "Are you ready to connect (Y/n)? " response;
+        if [ -n "$(echo $response | grep -i -E '^(Y|YES|YEP|N|NO|NOPE)$')" ]; then
+            if [ -n "$(echo $response | grep -i -E '^(N|NO|NOPE)$')" ]; then
+                echo 1>&2 "Aborted connection." && exit 0;
+            else
+                echo;
+            fi
+            confirmed=true;
+        elif [ -z "$response" ]; then  # empty reponse received
+            continue;
+        else
+            echo 1>&2 "Invalid response received.";
+        fi
+    done
+
 
     ## Build file to capture output
     outputfile="$(mktemp -u)";         # creates a temporary filename (no file)
