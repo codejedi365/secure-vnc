@@ -5,7 +5,7 @@
 #     Secure VNC Connect Agent     #
 #                                  #
 # Author: codejedi365              #
-# Date:   07 Nov 2020              #
+# Date:   27 Dec 2020              #
 #----------------------------------#
 # DESCRIPTION:
 # Interactive prompt
@@ -164,12 +164,12 @@ main() {
     ssh-add "$IDENTITY_KEY";            ## User Inputs their Private Key PIN (only once!) ##
     echo;
 
-    ## CURRENTLY Not desired to kill agent on script exit, likely only on script failure
-    # onExit_killsshagent() {          ## Remove SSH Agent on exit of script
-    #     ssh-add -D;                  # Delete ssh keys
-    #     eval `ssh-agent -k 2>&1 1>/dev/null`;
-    # }
-    # trap_sigexit_fns+=('onExit_killsshagent');     # Register Exit Handler
+    onExit_killsshagent() {          ## Remove SSH Agent on exit of script
+        ssh-add -D &>/dev/null;       # Delete ssh keys
+        eval `ssh-agent -k 2>&1 1>/dev/null`;
+        echo "ssh-agent destroyed."
+    }
+    trap_sigexit_fns+=('onExit_killsshagent');     # Register Exit Handler
 
 ## BUILD Dynamic Configuration file on-the-fly
     local CTRL_PATH="~/.ssh/sockets/%r@%h:%p"
