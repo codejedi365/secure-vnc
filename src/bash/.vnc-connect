@@ -24,9 +24,13 @@ WRK_DIR="$PWD";                                             # current location u
 [ -z "$DEFAULT_CONNECT_TYPE" ] && DEFAULT_CONNECT_TYPE="REMOTE";
 [ -z "$DEFAULT_VNC_PORT_LOCAL" ] && DEFAULT_VNC_PORT_LOCAL=15900;
 [ -z "$DEFAULT_VNC_PORT" ] && DEFAULT_VNC_PORT=5900;
+[ -n "$DEFAULT_NUM_OF_DISPLAYS" -a -z "$(echo "$DEFAULT_NUM_OF_DISPLAYS" | grep -E '^[1-4]$')" ] && unset DEFAULT_NUM_OF_DISPLAYS;
+[ -z "$DEFAULT_NUM_OF_DISPLAYS" ] && DEFAULT_NUM_OF_DISPLAYS=1;
 MODE_LAZY=false
 MODE_QUIET=false
 MODE_TEST=false
+## Prevent Env Pollution
+unset NUM_OF_DISPLAYS;
 
 ## ARRAY of registered functions to run on SIGEXIT
 ##   register a function by appending the name to the array 
@@ -147,6 +151,22 @@ interact_vnc() {
         VNC_PORT="$Rport"
         echo "VNC_PORT = $VNC_PORT" && echo;
 	fi
+
+    if [ -z "$NUM_OF_DISPLAYS" ]; then
+        local display_count = $DEFAULT_NUM_OF_DISPLAYS;
+        if [ "$MODE_LAZY" = false ]; then
+            echo "If desired, you can configure more than one display at a time which can create";
+            echo "the appearance of dual screens or more over VNC. Multiple ports will be forwarded.";
+            echo "Limit between 1 to 4.";
+            echo;
+            read -e -p "How many displays would you like [$DEFAULT_NUM_OF_DISPLAYS]? " display_count;
+        fi
+        if [ -z "$(echo $display_count | grep -E '^[ ]*[1-4][ ]*$')" ]; then
+            display_count=$DEFAULT_NUM_OF_DISPLAYS;
+        fi
+        NUM_OF_DISPLAYS=$display_count;
+        echo "NUM_OF_DISPLAYS = $NUM_OF_DISPLAYS" && echo;
+    fi
 }
 
 main() {
