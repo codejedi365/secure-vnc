@@ -5,7 +5,7 @@
 #      Remote SSH Login Agent      #
 #                                  #
 # Author: codejedi365              #
-# Date:   14 Oct 2020              #
+# Date:   27 Dec 2020              #
 #----------------------------------#
 
 # Interactive prompt
@@ -21,9 +21,10 @@ WRK_DIR="$PWD";                                             # current location u
 
 # Default Vars
 [ -z "$DEFAULT_SSH_PORT" ] && DEFAULT_SSH_PORT=22;
-MODE_LAZY=false
+[ -z "$MODE_LAZY" ] && MODE_LAZY=false
 MODE_PORTFWD=false
-MODE_QUIET=false
+[ -z "$MODE_QUIET" ] && MODE_QUIET=false
+MODE_TEST=false
 
 usage() {
     echo "Usage: $0 [-hlfqT] [-a <address>] [-p <port>] [-u <user>]" 1>&2; exit 1;
@@ -67,7 +68,7 @@ interact() {
         elif [ -z "$(grep -E '^(([0-9]{1,3}\.){3}[0-9]{1,3})$' <(echo "$dest"))" ]; then		# Check if address matches an IPv4 address
             echo 1>&2 "Invalid input. Expected an IPv4 address. Please try again."
         else
-            REMOTE_ADDRESS="$dest"
+            export REMOTE_ADDRESS="$dest";
             echo "ADDRESS=$REMOTE_ADDRESS"
         fi
     done
@@ -80,10 +81,19 @@ main() {
 	fi
 	interact
 	if [ -f "$SRC_DIR/.ssh-connect" ]; then
-		
-		. "$SRC_DIR/.ssh-connect" -q "${args2pass# }"
-		if [ "$?" == 1 ]; then
-			exit 1
+		if [ $MODE_TEST = true ]; then
+			. "$SRC_DIR/.ssh-connect" -q "${args2pass# }"
+		else
+			if [ ! -x "$SRC_DIR/.ssh-connect" ]; then
+				chmod u+x "$SRC_DIR/.ssh-connect";
+				[ "$?" != 0 ] && exit 127;
+			fi
+			"$SRC_DIR/.ssh-connect" -q "${args2pass# }";
+		fi
+		exit_code=$?;
+		if [ $exit_code != 0 ]; then
+			echo "Connection Failed. Exiting...";
+			exit $exit_code;
 		fi
 	else 
 		echo "FILE ./.ssh-connect NOT FOUND. Exiting...";
@@ -121,7 +131,8 @@ processArgs() {
 				args2pass="$args2pass -${o}"
 				;;
 			T)
-				[ -n "${OPTARG}" ] && usage; 
+				[ -n "${OPTARG}" ] && usage;
+				MODE_TEST=true
 				args2pass="$args2pass -${o}"
 				;;
 			q)

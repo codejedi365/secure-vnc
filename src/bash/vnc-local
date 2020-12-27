@@ -5,7 +5,7 @@
 #     Secure Local VNC Agent       #
 #                                  #
 # Author: codejedi365              #
-# Date:   14 Oct 2020              #
+# Date:   27 Dec 2020              #
 #----------------------------------#
 
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd )";   # source code location
@@ -50,10 +50,12 @@ main() {
     fi
 
     if [ -f "$SRC_DIR/.vnc-connect" ]; then
+        if [ ! -x "$SRC_DIR/.vnc-connect" ]; then
+			chmod u+x "$SRC_DIR/.vnc-connect"
+            [ "$?" != 0 ] && exit $?;
+		fi
         . "$SRC_DIR/.vnc-connect" -L -q "${args2pass# }"
-        if [ "$?" == 1 ]; then
-            exit 1
-        fi
+        [ "$?" != 0 ] && exit $?;
     else
         echo "FILE ./.vnc-connect NOT FOUND. Exiting...";
         exit 1
@@ -83,7 +85,7 @@ processArgs() {
             l)
                 [ -n "${OPTARG}" ] && usage;
                 args2pass="$args2pass -${o}"
-                MODE_LAZY=true
+                export MODE_LAZY=true;
                 ;;
             f)
                 [ -n "${OPTARG}" ] && usage;
@@ -95,7 +97,7 @@ processArgs() {
                 ;;
             q)
                 [ -n "${OPTARG}" ] && usage;
-                MODE_QUIET=true
+                export MODE_QUIET=true;
                 ;;
             *)
                 usage
