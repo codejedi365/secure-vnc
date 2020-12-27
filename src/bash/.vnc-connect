@@ -80,6 +80,16 @@ print_banner() {
     echo "========================";
 	echo "";
 }
+## Print horizontal line
+## param $1: character string to repeat across terminal width
+printHR() {
+    local COLS=82;
+    [ $(tput cols) -lt $COLS ] && COLS=$(tput cols);  # Adjust to terminal width
+    local char="$1";
+    [ -z "$char" ] && char="-"                        # Default print character '-'
+    local x=0;
+    while [ $x -lt $COLS ]; do echo -n "$char"; ((x++)); done; echo;
+}
 
 get_connection_type() {
 	if [ -z "$CONNECT_TYPE" ]; then
@@ -197,6 +207,7 @@ Host *
     trap_sigexit_fns+=('onExit_rm_DynamicSSHConfig');     # Register Exit Handler
 
     ## Confirm Authority to Connect
+    printHR '=';
     echo "All settings validated. Compiled connection command is:";
     echo -e "> ssh $SSH_USERNAME@$REMOTE_ADDRESS -p $SSH_PORT -i $IDENTITY_KEY\n";
     local confirmed=false
