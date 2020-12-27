@@ -85,7 +85,20 @@ check_user() {
 	echo $found
 }
 
-interact() {
+interact_ssh() {
+
+	if [ -z "$SSH_PORT" ]; then
+		if [ "$MODE_LAZY" = false ]; then
+			read -e -p "Remote service port [$DEFAULT_SSH_PORT]: " port;
+		fi
+		if [ -n "$port" ] && [[ $port > 0 ]] && [[ $port < 65536 ]]; then
+			SSH_PORT="$port"
+		else
+			SSH_PORT="$DEFAULT_SSH_PORT"
+		fi
+		echo "SSH_PORT=$SSH_PORT"
+	fi
+	
 	if [ -z "$SSH_USERNAME" ]; then
 		if [ "$MODE_LAZY" = false ]; then
 			print_users
@@ -157,18 +170,6 @@ interact() {
         builtin cd "$cwd";
     fi
 
-	if [ -z "$SSH_PORT" ]; then
-		if [ "$MODE_LAZY" = false ]; then
-			read -e -p "Remote service port [$DEFAULT_SSH_PORT]: " port;
-		fi
-		if [ -n "$port" ] && [[ $port > 0 ]] && [[ $port < 65536 ]]; then
-			SSH_PORT="$port"
-		else
-			SSH_PORT="$DEFAULT_SSH_PORT"
-		fi
-		echo "SSH_PORT=$SSH_PORT"
-	fi
-
 #	if [ "$MODE_PORTFWD" ]; then
     # Print difference of both forwarding types
     # Local or Remote Forwarding
@@ -197,7 +198,7 @@ main() {
 		exit 1;
 	fi
 	
-	interact
+	interact_ssh
 
 	if [ "$MODE_TEST" = true ]; then
 		[ "$MODE_QUIET" = false ] && (echo "PREVIEW: ssh $SSH_USERNAME@$REMOTE_ADDRESS -p $SSH_PORT");

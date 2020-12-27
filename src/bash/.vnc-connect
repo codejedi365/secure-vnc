@@ -81,8 +81,7 @@ print_banner() {
 	echo "";
 }
 
-interact() {
-
+get_connection_type() {
 	if [ -z "$CONNECT_TYPE" ]; then
 		if [ "$MODE_LAZY" = false ]; then
 			local valid=false
@@ -102,6 +101,9 @@ interact() {
 		fi
 		echo "CONNECT_TYPE = $CONNECT_TYPE"
 	fi
+}
+
+interact_vnc() {
 
     if [ -z "$VNC_PORT_LOCAL" ]; then
         if [ "$MODE_LAZY" = false ]; then
@@ -142,7 +144,7 @@ main() {
 		print_banner
 	fi
 	
-	interact
+    get_connection_type
 
 	# Call SSH Method in Test Mode ==> creates interaction for all vars
 	# VARS: SSH_USERNAME, REMOTE_ADDRESS, SSH_PORT, IDENTITY_KEY
@@ -162,7 +164,6 @@ main() {
     ## Initialize SSH-Agent in environment, add private key once!
     eval "$(ssh-agent -s)" 1>/dev/null;
     ssh-add "$IDENTITY_KEY";            ## User Inputs their Private Key PIN (only once!) ##
-    echo;
 
     ## CURRENTLY Not desired to kill agent on script exit, likely only on script failure
     # onExit_killsshagent() {          ## Remove SSH Agent on exit of script
@@ -170,6 +171,8 @@ main() {
     #     eval `ssh-agent -k 2>&1 1>/dev/null`;
     # }
     # trap_sigexit_fns+=('onExit_killsshagent');     # Register Exit Handler
+
+    echo && interact_vnc  # setup vnc parameters
 
 ## BUILD Dynamic Configuration file on-the-fly
     local CTRL_PATH="~/.ssh/sockets/%r@%h:%p"
