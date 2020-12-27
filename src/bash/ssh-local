@@ -5,7 +5,7 @@
 #      Local SSH Login Agent       #
 #                                  #
 # Author: codejedi365              #
-# Date:   14 Oct 2020              #
+# Date:   27 Dec 2020              #
 #----------------------------------#
 
 # Interactive prompt
@@ -25,6 +25,7 @@ WRK_DIR="$PWD";                                             # current location u
 MODE_LAZY=false
 MODE_PORTFWD=false
 MODE_QUIET=false
+MODE_TEST=false
 
 usage() {
     echo "Usage: $0 [-hlfqT] [-a <address>] [-p <port>] [-u <user>]" 1>&2; exit 1;
@@ -85,7 +86,7 @@ interact() {
                 echo 1>&2 "Invalid Input received. Please enter either a hostname or an IPv4 address.";
             fi
         done
-        REMOTE_ADDRESS="$dest"
+        export REMOTE_ADDRESS="$dest";
         echo "ADDRESS=$REMOTE_ADDRESS"
     fi
 	
@@ -99,10 +100,19 @@ main() {
 	fi
 	interact
 	if [ -f "$SRC_DIR/.ssh-connect" ]; then
-		. "$SRC_DIR/.ssh-connect" -q "${args2pass# }"
-		if [ "$?" == 1 ]; then
+		if [ $MODE_TEST = true ]; then
+			. "$SRC_DIR/.ssh-connect" -q "${args2pass# }"
+		else
+			if [ ! -x "$SRC_DIR/.ssh-connect" ]; then
+				chmod u+x "$SRC_DIR/.ssh-connect";
+				[ "$?" != 0 ] && exit 127;
+			fi
+			"$SRC_DIR/.ssh-connect" -q "${args2pass# }";
+		fi
+		exit_code=$?;
+		if [ $exit_code != 0 ]; then
 			echo "Connection Failed. Exiting...";
-			exit 1
+			exit $exit_code;
 		fi
 	else 
 		echo "FILE ./.ssh-connect NOT FOUND. Exiting...";
@@ -146,8 +156,9 @@ processArgs() {
 				args2pass="$args2pass -${o}"
 				;;
 			T)
-				[ -n "${OPTARG}" ] && usage; 
-				args2pass="$args2pass -${o}"
+				[ -n "${OPTARG}" ] && usage;
+				MODE_TEST=true;
+				args2pass="$args2pass -${o}";
 				;;
 			q)
 				MODE_QUIET=true
