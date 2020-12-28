@@ -260,21 +260,19 @@ main() {
 
     echo && interact_vnc  # setup vnc parameters
 
-## BUILD Dynamic Configuration file on-the-fly
-    local CTRL_PATH="~/.ssh/sockets/%r@%h:%p"
-    local CONFIG_OPTS="\
-Host *
-  ExitOnForwardFailure yes
-  ServerAliveCountMax 6
-  ServerAliveInterval 10
-  ControlMaster auto
-  ControlPath $CTRL_PATH
-  ControlPersist 30
-  PreferredAuthentications publickey
-  IdentityFile $IDENTITY_KEY
-";
+    ## BUILD Dynamic Configuration file on-the-fly
+    local SSH_BASE_CONFIG_SETTINGS=()
+    SSH_BASE_CONFIG_SETTINGS+=("Host *")
+    SSH_BASE_CONFIG_SETTINGS+=("  Port $SSH_PORT")
+    SSH_BASE_CONFIG_SETTINGS+=("  User $SSH_USERNAME")
+    SSH_BASE_CONFIG_SETTINGS+=("  PreferredAuthentications publickey")
+    SSH_BASE_CONFIG_SETTINGS+=("  IdentityFile $IDENTITY_KEY")
 
-    echo "$CONFIG_OPTS" > "$WRK_DIR"/dynamic-config;
+    ## Write connection settings to configuration file
+    echo -n "" > "${WRK_DIR}/dynamic-config";  # Ensure clean file
+    for i in "${!SSH_BASE_CONFIG_SETTINGS[@]}"; do
+        echo "${SSH_BASE_CONFIG_SETTINGS[$i]}" >> "${WRK_DIR}/dynamic-config"
+    done
 
     ## Remove dynamic-config file on exit of script
     onExit_rm_DynamicSSHConfig() {
@@ -322,7 +320,7 @@ Host *
     VNC_PORTS_LOCAL=()
 
     echo -e "Sending query to vncserver...\n";
-    ssh -TF "$WRK_DIR/dynamic-config" -p "$SSH_PORT" "$SSH_USERNAME@$REMOTE_ADDRESS" '/bin/bash -c "vncserver -list -cleanstale 2>&1"' 1>&3
+    ssh -TF "$WRK_DIR/dynamic-config" "$REMOTE_ADDRESS" '/bin/bash -c "vncserver -list -cleanstale 2>&1"' 1>&3
     RC=$? && [ $RC != 0 ] && exit $RC;
     local rCMD_output="$(cat $outputfile)"; echo > $outputfile;
 
@@ -466,14 +464,27 @@ Host *
     ## ------------------------------------ ##
 
     ## Build control master connection (main tunnel)
+    local CTRL_PATH="~/.ssh/sockets/%r@%h:%p"
+    local SSH_PERSISTENTCONN_CONFIG_SETTINGS=()
+    SSH_PERSISTENTCONN_CONFIG_SETTINGS+=("ExitOnForwardFailure yes");
+    SSH_PERSISTENTCONN_CONFIG_SETTINGS+=("ServerAliveCountMax 6");
+    SSH_PERSISTENTCONN_CONFIG_SETTINGS+=("ServerAliveInterval 10");
+    SSH_PERSISTENTCONN_CONFIG_SETTINGS+=("ControlMaster auto");
+    SSH_PERSISTENTCONN_CONFIG_SETTINGS+=("ControlPath $CTRL_PATH");
+    SSH_PERSISTENTCONN_CONFIG_SETTINGS+=("ControlPersist 30");
+    ## Append persistent connection settings to configuration file
+    for i in "${!SSH_PERSISTENTCONN_CONFIG_SETTINGS[@]}"; do
+        echo "  ${SSH_PERSISTENTCONN_CONFIG_SETTINGS[$i]}" >> "${WRK_DIR}/dynamic-config"
+    done
+
+    ## Append Local Port Forwarding configuration settings to configuration file
     local OPT_LOCAL_FORWARD="";
-    
     for i in "${!VNC_PORTS_LOCAL[@]}"; do
         OPT_LOCAL_FORWARD="LocalForward ${VNC_PORTS_LOCAL[$i]} localhost:${VNC_PORTS[$i]}";
         echo "  $OPT_LOCAL_FORWARD" >> "${WRK_DIR}/dynamic-config";
     done
     ### ESTABLISH PERSISTENT CONNECTION ####
-    ssh -fTN -F "$WRK_DIR"/dynamic-config -p $SSH_PORT "$SSH_USERNAME@$REMOTE_ADDRESS"
+    ssh -fTN -F "${WRK_DIR}/dynamic-config" "$REMOTE_ADDRESS"
     tunnelPID=$!
 
     # Action Success check
