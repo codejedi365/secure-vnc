@@ -97,9 +97,9 @@ printHR() {
 
 get_connection_type() {
 	if [ -z "$CONNECT_TYPE" ]; then
-		if [ "$MODE_LAZY" = false ]; then
+		if [ "$MODE_LAZY" == false ]; then
 			local valid=false
-			while [ "$valid" = false ]; do
+			while [ "$valid" == false ]; do
 				read -e -p "Connection type (REMOTE/LOCAL) [$DEFAULT_CONNECT_TYPE]: " CONN_TYPE;
 				if [ -n "$CONN_TYPE" -a [ -n "$(grep -i -E '^(remote|R|local|L)$' <(echo "$CONN_TYPE"))"] ]; then
 					valid=true
@@ -120,7 +120,7 @@ get_connection_type() {
 interact_vnc() {
 
     if [ -z "$VNC_PORT_LOCAL" ]; then
-        if [ "$MODE_LAZY" = false ]; then
+        if [ "$MODE_LAZY" == false ]; then
             echo "Your VNC session will be wrapped in an SSH Tunnel which requires configuring";
             echo "a local port to forward your requests to the remote host. The actual port";
             echo "number will automatically increment matching the number of displays in-use on";
@@ -138,7 +138,7 @@ interact_vnc() {
     fi
 
     # if [ -z "$VNC_PORT" ]; then
-    #     if [ "$MODE_LAZY" = false ]; then
+    #     if [ "$MODE_LAZY" == false ]; then
     #         echo "If the remote host's VNC server has a different base port configured, enter it";
     #         echo "here. VNC's default is 5900, meaning display :1 will be on port 5901.";
     #         echo;
@@ -153,8 +153,8 @@ interact_vnc() {
 	# fi
 
     if [ -z "$NUM_OF_DISPLAYS" ]; then
-        local display_count = $DEFAULT_NUM_OF_DISPLAYS;
-        if [ "$MODE_LAZY" = false ]; then
+        local display_count=$DEFAULT_NUM_OF_DISPLAYS;
+        if [ "$MODE_LAZY" == false ]; then
             echo "If desired, you can configure more than one display at a time which can create";
             echo "the appearance of dual screens or more over VNC. Multiple ports will be forwarded.";
             echo "Limit between 1 to 4.";
@@ -226,7 +226,7 @@ spawn_vnc_client() {
 #######################################
 main() {
     local i=0;
-	if [ "$MODE_QUIET" = false ]; then
+	if [ "$MODE_QUIET" == false ]; then
 		print_banner
 	fi
 	
@@ -285,7 +285,7 @@ main() {
     echo "All settings validated. Compiled connection command is:";
     echo -e "> ssh $SSH_USERNAME@$REMOTE_ADDRESS -p $SSH_PORT -i $IDENTITY_KEY\n";
     local confirmed=false
-    while [ "$confirmed" = false ]; do
+    while [ "$confirmed" == false ]; do
         read -e -p "Are you ready to connect (Y/n)? " response;
         if [ -n "$(echo $response | grep -i -E '^(Y|YES|YEP|N|NO|NOPE)$')" ]; then
             if [ -n "$(echo $response | grep -i -E '^(N|NO|NOPE)$')" ]; then
@@ -330,9 +330,9 @@ main() {
     local port_list=($(echo "$rCMD_output" | awk -F "[ ][ ]+|\t+" "NR>${lineNumHeaders} {print \$2}"));
 
     ## MORE THAN 1 Display found for this user.
-    if [[ ${#port_list[@]} > 1 ]]; then
+    if (( ${#port_list[@]} > 1 )); then
         echo -e "${#port_list[@]} existing displays found.\n";
-        if [ ${#port_list[@]} <= $NUM_OF_DISPLAYS ]; then
+        if (( ${#port_list[@]} <= $NUM_OF_DISPLAYS )); then
             ## Number of existing displays matches or is less than users number of desired displays
             ## Auto-connect all
             local joined_list=""
@@ -342,7 +342,7 @@ main() {
                 VNC_PORTS_LOCAL+=($((VNC_PORT_LOCAL+VNC_DISPLAY_NUMBER)));
                 ## [].join()
                 joined_list+="${port_list[$i]}";
-                [[ $((i+1)) < ${#port_list[@]} ]] && joined_list+=", ";
+                (( $i+1 < ${#port_list[@]} )) && joined_list+=", ";
             done
             echo "Resuming sessions on ports "$joined_list"...";
 
@@ -357,7 +357,7 @@ main() {
             echo; # Add spacing
 
             confirmed=false;
-            while [ "$confirmed" = false ]; do
+            while [ "$confirmed" == false ]; do
                 read -e -p "Which session do you want to resume (${opts_str}) or create new (n)? " answer;
                 if [ -n "$(echo $answer | grep -i -E "^(${opts_regex}|N|NEW)\$")" ]; then        # Check if valid entry
                     if [ -n "$(echo $answer | grep -i -E '^(N|NEW)$')" ]; then
@@ -380,18 +380,18 @@ main() {
             done
         fi
 
-    elif [ ${#port_list[@]} == 1 ]; then
+    elif [ ${#port_list[@]} -eq 1 ]; then
         echo "Existing Display found!";
         confirmed=false;
         local decision="";
         local user_asked=true;
-        if [[ ${#port_list[@]} < $NUM_OF_DISPLAYS ]]; then
+        if (( ${#port_list[@]} < $NUM_OF_DISPLAYS )); then
             ## Existing displays will be consumed as part of total displays desired
             confirmed=true;     # bypass input
             decision="resume";
             user_asked=false;
         fi
-        while [ "$confirmed" = false ]; do
+        while [ "$confirmed" == false ]; do
             read -e -p "Do you want to resume your session (Y/n)? " answer;
             if [ -n "$(echo $answer | grep -i -E '^(Y|YES|YEP|N|NO|NOPE)$')" ]; then
                 if [ -n "$(echo $answer | grep -i -E '^(N|NO|NOPE)$')" ]; then
@@ -422,7 +422,7 @@ main() {
 
     else
         echo -e "No existing displays found.\n";
-        if [ $NUM_OF_DISPLAYS = 1 ]; then
+        if [ $NUM_OF_DISPLAYS -eq 1 ]; then
             echo "Initializing new display for $SSH_USERNAME...";
         else
             echo "Initializing $NUM_OF_DISPLAYS new displays for $SSH_USERNAME...";
@@ -434,7 +434,7 @@ main() {
     if [ ${#VNC_PORTS_LOCAL[@]} != $NUM_OF_DISPLAYS ]; then
         local netDifference=$((NUM_OF_DISPLAYS-${#VNC_PORTS_LOCAL[@]}));
         if [ ${#VNC_PORTS_LOCAL[@]} != 0 ]; then
-            if [ $netDifference = 1 ]; then
+            if [ $netDifference -eq 1 ]; then
                 echo "Spawning an additional desktop session...";
             else
                 echo "Spawning ${netDifference} additional desktop sessions...";
@@ -445,10 +445,10 @@ main() {
         done
     fi
     ## Recap
-    [[ $NUM_OF_DISPLAYS > 1 ]] && echo -n "VNC DISPLAYS are " || echo -n "VNC DISPLAY = ";
+    (( $NUM_OF_DISPLAYS > 1 )) && echo -n "VNC DISPLAYS are " || echo -n "VNC DISPLAY = ";
     for i in "${!VNC_DISPLAY_NUMBERS[@]}"; do
         echo -n ":${VNC_DISPLAY_NUMBERS[$i]}";
-        if [ $i == ${#VNC_DISPLAY_NUMBERS[@]} ]; then
+        if [ $((i+1)) -eq ${#VNC_DISPLAY_NUMBERS[@]} ]; then
             echo -e "\n";
         else
             [ $((i+1)) == ${#VNC_DISPLAY_NUMBERS[@]} ] && echo -n " & " || echo -n ", ";
@@ -500,9 +500,11 @@ main() {
         echo "TUNNEL: 127.0.0.1:${VNC_PORTS_LOCAL[$i]} >>>> $REMOTE_ADDRESS:${VNC_PORTS[$i]}";
     done
     echo "...";
+    echo "Enter the VNC Access password in the $([ $NUM_OF_DISPLAYS -eq 1 ] && echo "popup" || echo "popups").";
     for i in "${!VNC_PORTS_LOCAL[@]}"; do
         local VNC_URL="vnc://localhost:${VNC_PORTS_LOCAL[$i]}";
         spawn_vnc_client "$VNC_URL";
+        (( ${#VNC_PORTS_LOCAL[@]} > 1 )) && sleep 5s;
     done
 
     echo "Enter the VNC Access password in the $([[ $NUM_OF_DISPLAYS == 1 ]] && echo "popup" || echo "popups").";
