@@ -194,11 +194,9 @@ spawn_vnc_client() {
         Linux*)
             programopener='vncviewer';
             VNC_URL="localhost:$host_port";
-            echo "# [VNC App] 127.0.0.1:$host_port >>>> TUNNEL";
             ;;
         Darwin*)
             programopener='open';
-            echo "# ScreenSharing.app 127.0.0.1:$host_port >>>> TUNNEL";
             ;;
         CYGWIN*)
             errortxt="CYGWIN is not currently supported. You will have to open ";
@@ -215,7 +213,7 @@ spawn_vnc_client() {
     [ $? != 0 ] && echo 1>&2 "There was an error opening your default VNC program." && exit -2;
 
     #      if [ -z "$(netstat -tln | grep "$VNC_PORT_LOCAL" )" ]; then              # alternative if
-    if [ -z "$(lsof -t -i @localhost:"$VNC_PORT_LOCAL" -sTCP:listen )" ]; then       #gets PID of listening process
+    if [ -z "$(lsof -t -i @localhost:"$host_port" -sTCP:listen )" ]; then       #gets PID of listening process
         echo "Error: Secure tunnel persistence failed. Exiting..."; exit 1;
     fi
 }
@@ -337,14 +335,15 @@ main() {
             ## Auto-connect all
             local joined_list=""
             for i in "${!port_list[@]}"; do
-                VNC_DISPLAY_NUMBER=${dnum_list[$i]}
+                VNC_DISPLAY_NUMBER=${dnum_list[$i]};
+                VNC_DISPLAY_NUMBERS+=($VNC_DISPLAY_NUMBER);
                 VNC_PORTS+=($((port_list[$i])));
                 VNC_PORTS_LOCAL+=($((VNC_PORT_LOCAL+VNC_DISPLAY_NUMBER)));
                 ## [].join()
                 joined_list+="${port_list[$i]}";
                 (( $i+1 < ${#port_list[@]} )) && joined_list+=", ";
             done
-            echo "Resuming sessions on ports "$joined_list"...";
+            echo "Resuming sessions on remote ports "$joined_list"...";
 
         else   # There are more existing displays than asked for.
             echo -e "[opt]\tX DISPLAY\tRFC PORT #";
@@ -365,7 +364,7 @@ main() {
                         ## Fall-through logic to startup a new desktop
                     else
                         local session_i=$((answer-1));
-                        echo "[CONFIRMED] Resuming session on port ${port_list[$session_i]}...";
+                        echo "[CONFIRMED] Resuming session on remote port ${port_list[$session_i]}...";
                         VNC_DISPLAY_NUMBER=${dnum_list[$session_i]};
                         VNC_DISPLAY_NUMBERS+=($VNC_DISPLAY_NUMBER);
                         VNC_PORTS+=(${port_list[$session_i]});
@@ -409,7 +408,7 @@ main() {
         local prefix="$([ "$user_asked" == true ] && echo "[CONFIRMED] " || echo "";)"
         case "$decision" in
             "resume")
-                echo "${prefix}Resuming session on port ${port_list[0]}...";
+                echo "${prefix}Resuming session on remote port ${port_list[0]}...";
                 VNC_DISPLAY_NUMBER=${dnum_list[0]}
                 VNC_DISPLAY_NUMBERS+=($VNC_DISPLAY_NUMBER);
                 VNC_PORTS+=(${port_list[0]});
@@ -451,7 +450,7 @@ main() {
         if [ $((i+1)) -eq ${#VNC_DISPLAY_NUMBERS[@]} ]; then
             echo -e "\n";
         else
-            [ $((i+1)) == ${#VNC_DISPLAY_NUMBERS[@]} ] && echo -n " & " || echo -n ", ";
+            [ $((i+2)) == ${#VNC_DISPLAY_NUMBERS[@]} ] && echo -n " & " || echo -n ", ";
         fi
     done
 
@@ -507,10 +506,8 @@ main() {
         (( ${#VNC_PORTS_LOCAL[@]} > 1 )) && sleep 5s;
     done
 
-    echo "Enter the VNC Access password in the $([[ $NUM_OF_DISPLAYS == 1 ]] && echo "popup" || echo "popups").";
-    echo "";
-    echo "Enjoy your VNC Desktop session!";
-    echo "Once you exit, the secure tunnel will collapse in 30 seconds." && echo "";
+    echo && echo "Enjoy your VNC Desktop session!";
+    echo "Once you exit, the secure tunnel will collapse in 30 seconds." && echo;
 
 }
 
