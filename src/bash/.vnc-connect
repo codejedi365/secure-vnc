@@ -5,7 +5,7 @@
 #     Secure VNC Connect Agent     #
 #                                  #
 # Author: codejedi365              #
-# Date:   27 Dec 2020              #
+# Date:   28 Dec 2020              #
 #----------------------------------#
 # DESCRIPTION:
 # Interactive prompt
@@ -169,6 +169,61 @@ interact_vnc() {
     fi
 }
 
+start_remote_display() {
+    ssh -TF "$WRK_DIR/dynamic-config" -p "$SSH_PORT" "$SSH_USERNAME@$REMOTE_ADDRESS" '/bin/bash -c "vncserver 2>&1; echo "===="; vncserver -list 2>&1"' 1>&3
+    local RC=$? && [ $RC != 0 ] && exit $RC;
+    local rCMD_output="$(cat $outputfile)"; echo > $outputfile;
+    local display_num=$(echo "$rCMD_output" | grep "desktop" | sed -E 's/.*desktop at :([0-9]+) on.*/\1/');
+    local lineNumHeaders=$(echo "$rCMD_output" | grep -n "PORT #" | awk -F ":" '{print $1}');                 # Gives a line number
+    local port=$(echo "$rCMD_output" | awk -F "[ ][ ]+|\t+" "NR>${lineNumHeaders} { when=match(\$0, /:${display_num}/); if (when != 0) print \$2 }");
+    if [ -z "$display_num" ] || [ -z "$port" ]; then
+        echo 1>&2 "Error: VNC Server startup attempt failed. Exiting..."; exit 1;
+    fi
+    VNC_DISPLAY_NUMBERS+=($display_num);
+    VNC_PORTS+=($((port-display_num)));      # Set port in case user was wrong. Thanks to TigerVNC I have the port & display numbers
+    echo "[$REMOTE_ADDRESS] vncserver: New desktop started on 127.0.0.1:$port.";
+    VNC_PORTS_LOCAL+=($((VNC_PORT_LOCAL+display_num)));
+}
+
+spawn_vnc_client() {
+    local VNC_URL="$1"
+    local host_port="$(echo $VNC_URL | sed -r 's/^.*:([0-9]+)\/?$/\1/')"
+    local unameOut="$(uname -s)";
+    local programopener;
+    case "${unameOut}" in
+        Linux*)
+            programopener='vncviewer';
+            VNC_URL="localhost:$host_port";
+            echo "# [VNC App] 127.0.0.1:$host_port >>>> TUNNEL";
+            ;;
+        Darwin*)
+            programopener='open';
+            echo "# ScreenSharing.app 127.0.0.1:$host_port >>>> TUNNEL";
+            ;;
+        CYGWIN*)
+            errortxt="CYGWIN is not currently supported. You will have to open ";
+            errortxt+="your VNC client mannually to $VNC_URL ";
+            errortxt+="before the SSH Tunnel collapses.";
+            echo 1>&2 "$errortxt" && exit -1;
+            ;;
+        *)
+            echo 1>&2 "ERROR: Unsupported system type ($unameOut) detected. Quiting..." && exit -1;
+            ;;
+    esac
+    echo "${programopener} ${VNC_URL}";
+    bash -c "${programopener} ${VNC_URL}" 2>/dev/null;
+    [ $? != 0 ] && echo 1>&2 "There was an error opening your default VNC program." && exit -2;
+
+    #      if [ -z "$(netstat -tln | grep "$VNC_PORT_LOCAL" )" ]; then              # alternative if
+    if [ -z "$(lsof -t -i @localhost:"$VNC_PORT_LOCAL" -sTCP:listen )" ]; then       #gets PID of listening process
+        echo "Error: Secure tunnel persistence failed. Exiting..."; exit 1;
+    fi
+}
+
+
+#######################################
+##           MAIN FUNCTION           ##
+#######################################
 main() {
 	if [ "$MODE_QUIET" = false ]; then
 		print_banner
@@ -261,7 +316,9 @@ Host *
     ##    TEMPLATE: ssh -fT <username>@<address> -p <ssh_port> <cmd>
     ##  - vnc outputs to stderr (fd 2) therefore redirect to stdout to grab in variable
 
-    local VNC_DISPLAY_NUMBER=0
+    VNC_DISPLAY_NUMBERS=()
+    VNC_PORTS=()
+    VNC_PORTS_LOCAL=()
 
     echo -e "Sending query to vncserver...\n";
     ssh -TF "$WRK_DIR/dynamic-config" -p "$SSH_PORT" "$SSH_USERNAME@$REMOTE_ADDRESS" '/bin/bash -c "vncserver -list -cleanstale 2>&1"' 1>&3
@@ -276,50 +333,75 @@ Host *
     # MORE THAN 1 Display found for this user.
     if [[ ${#port_list[@]} > 1 ]]; then
         echo "${#port_list[@]} existing displays found."
-        echo -e "[opt]\tX DISPLAY\tRFC PORT #";
-        opts_str=""  # Build prompt
-        for i in "${!port_list[@]}"; do
-            echo -e "[$((i+1))]\t:${dnum_list[$i]}\t\t${port_list[$i]}";
-            opts_str+=`[ $((i+1)) != ${#port_list[@]} ] && echo "$((i+1))/" || echo "$((i+1))"`;
-        done
-        opts_regex="$(awk '{ gsub(/\//,"|"); print }' <<< "$opts_str")";
-        echo; # Add spacing
+        if [ ${#port_list[@]} == $NUM_OF_DISPLAYS ]; then
+            ## Number of existing displays matches users number of desired displays
+            ## Auto-connect all
 
-        local confirmed=false;
-        while [ "$confirmed" = false ]; do
-            read -e -p "Which session do you want to resume (${opts_str}) or create new (n)? " answer;
-            if [ -n "$(echo $answer | grep -i -E "^(${opts_regex}|N|NEW)\$")" ]; then        # Check if valid entry
-                if [ -n "$(echo $answer | grep -i -E '^(N|NEW)$')" ]; then
-                    echo -e "[CONFIRMED] Spawning a new desktop session...\n";
-                    ## Fall-through logic to startup a new desktop
-                else
-                    local session_i=$((answer-1));
-                    echo "[CONFIRMED] Resuming session on port ${port_list[$session_i]}...";
-                    VNC_DISPLAY_NUMBER=${dnum_list[$session_i]};
-                    VNC_PORT=$((port_list[$session_i]-VNC_DISPLAY_NUMBER));
+
+
+
+        elif [[ ${#port_list[@]} < $NUM_OF_DISPLAYS ]]; then
+            ## Existing displays will be consumed as part of total displays desired
+            #
+
+
+                        # echo "[CONFIRMED] Resuming session on port ${port_list[$session_i]}...";
+                        # VNC_DISPLAY_NUMBER=${dnum_list[$session_i]};
+                        # VNC_PORT=$((port_list[$session_i]-VNC_DISPLAY_NUMBER));
+
+
+
+
+        else   # There are more existing displays than asked for.
+            echo -e "[opt]\tX DISPLAY\tRFC PORT #";
+            opts_str=""  # Build prompt
+            for i in "${!port_list[@]}"; do
+                echo -e "[$((i+1))]\t:${dnum_list[$i]}\t\t${port_list[$i]}";
+                opts_str+=`[ $((i+1)) != ${#port_list[@]} ] && echo "$((i+1))/" || echo "$((i+1))"`;
+            done
+            opts_regex="$(awk '{ gsub(/\//,"|"); print }' <<< "$opts_str")";
+            echo; # Add spacing
+
+            confirmed=false;
+            while [ "$confirmed" = false ]; do
+                read -e -p "Which session do you want to resume (${opts_str}) or create new (n)? " answer;
+                if [ -n "$(echo $answer | grep -i -E "^(${opts_regex}|N|NEW)\$")" ]; then        # Check if valid entry
+                    if [ -n "$(echo $answer | grep -i -E '^(N|NEW)$')" ]; then
+                        echo -e "[CONFIRMED] Spawning a new desktop session...\n";
+                        ## Fall-through logic to startup a new desktop
+                    else
+                        local session_i=$((answer-1));
+                        echo "[CONFIRMED] Resuming session on port ${port_list[$session_i]}...";
+                        VNC_DISPLAY_NUMBER=${dnum_list[$session_i]};
+                        VNC_PORT=$((port_list[$session_i]-VNC_DISPLAY_NUMBER));
+                    fi
+                    confirmed=true;
+                elif [ -z "$answer" ]; then
+                    continue;
+                else 
+                    echo 1>&2 "Invalid response received. Try again.";
                 fi
-                confirmed=true;
-            elif [ -z "$answer" ]; then
-                continue;
-            else 
-                echo 1>&2 "Invalid response received. Try again.";
-            fi
-        done
-
+            done
+        fi
 
     elif [ ${#port_list[@]} == 1 ]; then
         echo "Existing Display found!";
-        local confirmed=false;
+        confirmed=false;
+        local decision="";
+        local user_asked=true;
+        if [[ ${#port_list[@]} < $NUM_OF_DISPLAYS ]]; then
+            ## Existing displays will be consumed as part of total displays desired
+            confirmed=true;     # bypass input
+            decision="resume";
+            user_asked=false;
+        fi
         while [ "$confirmed" = false ]; do
             read -e -p "Do you want to resume your session (Y/n)? " answer;
             if [ -n "$(echo $answer | grep -i -E '^(Y|YES|YEP|N|NO|NOPE)$')" ]; then
                 if [ -n "$(echo $answer | grep -i -E '^(N|NO|NOPE)$')" ]; then
-                    echo -e "[CONFIRMED] Spawning a new desktop session...\n";
-                    ## Fall-through logic to startup a new desktop
+                    decision="new";
                 else
-                    echo "[CONFIRMED] Resuming session on port ${port_list[0]}...";
-                    VNC_DISPLAY_NUMBER=${dnum_list[0]};
-                    VNC_PORT=$((port_list[0]-VNC_DISPLAY_NUMBER));
+                    decision="resume";
                 fi
                 confirmed=true;
             elif [ -z "$answer" ]; then
@@ -328,98 +410,104 @@ Host *
                 echo 1>&2 "Invalid response received. Try again.";
             fi
         done
+        local prefix="$([ "$user_asked" == true ] && echo "[CONFIRMED] " || echo "";)"
+        case "$decision" in
+            "resume")
+                echo "${prefix}Resuming session on port ${port_list[0]}...";
+                VNC_DISPLAY_NUMBERS+=(${dnum_list[0]});
+                VNC_PORTS+=($((port_list[0]-${dnum_list[0]})));
+                VNC_PORTS_LOCAL+=($((VNC_PORT_LOCAL+${dnum_list[0]})));
+                ;;
+            "new")
+                echo -e "${prefix}Spawning a new desktop session...\n";
+                ## Fall-through logic to startup a new desktop
+        esac
+
     else
         echo -e "No existing displays found.\n";
-        echo "Initializing new display for $SSH_USERNAME...";
-    fi
-
-
-    ## Either fall-through logic or No displays previously found, initiate a desktop
-    if [ $VNC_DISPLAY_NUMBER == 0 ]; then  
-        ssh -TF "$WRK_DIR/dynamic-config" -p "$SSH_PORT" "$SSH_USERNAME@$REMOTE_ADDRESS" '/bin/bash -c "vncserver 2>&1; echo "===="; vncserver -list 2>&1"' 1>&3
-        RC=$? && [ $RC != 0 ] && exit $RC;
-        rCMD_output="$(cat $outputfile)"; echo > $outputfile;
-        display_num=$(echo "$rCMD_output" | grep "desktop" | sed -E 's/.*desktop at :([0-9]+) on.*/\1/');
-        lineNumHeaders=$(echo "$rCMD_output" | grep -n "PORT #" | awk -F ":" '{print $1}');                 # Gives a line number
-        local port=$(echo "$rCMD_output" | awk -F "[ ][ ]+|\t+" "NR>${lineNumHeaders} { when=match(\$0, /:${display_num}/); if (when != 0) print \$2 }");
-        if [ -z "$display_num" ] || [ -z "$port" ]; then
-            echo 1>&2 "Error: VNC Server startup attempt failed. Exiting..."; exit 1;
+        if [ $NUM_OF_DISPLAYS = 1 ]; then
+            echo "Initializing new display for $SSH_USERNAME...";
+        else
+            echo "Initializing $NUM_OF_DISPLAYS new displays for $SSH_USERNAME...";
         fi
-        VNC_DISPLAY_NUMBER=$display_num;
-        VNC_PORT=$((port-display_num));      # Set port in case user was wrong. Thanks to TigerVNC I have the port & display numbers
-        echo "[$REMOTE_ADDRESS] vncserver: New desktop started on 127.0.0.1:$port.";
     fi
 
-    echo "VNC DISPLAY = :${VNC_DISPLAY_NUMBER}" && echo;
-
-    VNC_PORT=$((VNC_PORT+VNC_DISPLAY_NUMBER));
-    VNC_PORT_LOCAL=$((VNC_PORT_LOCAL+VNC_DISPLAY_NUMBER));
+    ## Either fall-through logic or No displays previously found
+    ## ACTION: Build remaining displays requested
+    if [ ${#VNC_PORTS_LOCAL[@]} != $NUM_OF_DISPLAYS ]; then
+        local netDifference=$((NUM_OF_DISPLAYS-${#VNC_PORTS_LOCAL[@]}));
+        if [ ${#VNC_PORTS_LOCAL[@]} != 0 ]; then
+            if [ $netDifference = 1 ]; then
+                echo "Spawning an additional desktop session...";
+            else
+                echo "Spawning ${netDifference} additional desktop sessions...";
+            fi
+        fi        
+        while [ ${#VNC_PORTS_LOCAL[@]} != $NUM_OF_DISPLAYS ]; do
+            start_remote_display;
+        done
+    fi
+    ## Recap
+    [[ $NUM_OF_DISPLAYS > 1 ]] && echo -n "VNC DISPLAYS are " || echo -n "VNC DISPLAY = ";
+    local i=0
+    while [[ $i < $NUM_OF_DISPLAYS ]]; do
+        echo -n ":${VNC_DISPLAY_NUMBERS[i]}";
+        if [ $i == $NUM_OF_DISPLAYS ]; then
+            echo -e "\n";
+        else
+            [ $((i+1)) == $NUM_OF_DISPLAYS ] && echo -n " & " || echo -n ", ";
+        fi
+        ((i++));
+    done
 
     # Close file descriptor & delete is handled by SIGEXIT trap
     exec 3>&-;
+
 
     ## ------------------------------------ ##
     ## Set up Secure Tunnel Port-Forwarding ##
     ## ------------------------------------ ##
 
     ## Build control master connection (main tunnel)
-    OPT_LOCAL_FORWARD="LocalForward $VNC_PORT_LOCAL localhost:$VNC_PORT";
-    CONFIG_OPTS="$CONFIG_OPTS  $OPT_LOCAL_FORWARD";
-    echo "$CONFIG_OPTS" > "$WRK_DIR"/dynamic-config;
+    local OPT_LOCAL_FORWARD="";
+    i=0;
+    while [[ $i < ${#VNC_PORTS_LOCAL[@]} ]]; do
+        OPT_LOCAL_FORWARD="LocalForward ${VNC_PORTS_LOCAL[i]} localhost:${VNC_PORTS[i]}";
+        echo "  $OPT_LOCAL_FORWARD" >> "${WRK_DIR}/dynamic-config";
+        ((i++));
+    done
+    ### ESTABLISH PERSISTENT CONNECTION ####
     ssh -fTN -F "$WRK_DIR"/dynamic-config -p $SSH_PORT "$SSH_USERNAME@$REMOTE_ADDRESS"
     tunnelPID=$!
 
     # Action Success check
     if [ -n "$(ssh -F "$WRK_DIR"/dynamic-config -O check "$SSH_USERNAME@$REMOTE_ADDRESS" 2>&1 | grep -E "Master running (pid=[0-9]+)" )" ]; then
-        echo 1>&2 "Control Master creation failed.";
-    else
-        echo "Using this generated SSH config:" && cat "${WRK_DIR}/dynamic-config" && echo
-        echo "ssh $SSH_USERNAME@$REMOTE_ADDRESS -p $SSH_PORT -i $IDENTITY_KEY";
-        echo "SSH Connection established.";
-        echo "TUNNEL: 127.0.0.1:$VNC_PORT_LOCAL >>>> $REMOTE_ADDRESS:$VNC_PORT";
+        echo 1>&2 "Control Master creation failed."; exit -3;
     fi
 
+    echo "Using this generated SSH config:" && cat "${WRK_DIR}/dynamic-config" && echo
+    echo "ssh $SSH_USERNAME@$REMOTE_ADDRESS -p $SSH_PORT -i $IDENTITY_KEY";
+    echo "SSH Connection established.";
+
+    i=0;
+    while [[ $i < ${#VNC_PORTS_LOCAL[@]} ]]; do
+        echo "TUNNEL: 127.0.0.1:${VNC_PORTS_LOCAL[i]} >>>> $REMOTE_ADDRESS:${VNC_PORTS[i]}";
+        ((i++));
+    done
     echo "...";
-    local VNC_URL="vnc://localhost:$VNC_PORT_LOCAL";
-    local unameOut="$(uname -s)";
-    local programopener;
-    case "${unameOut}" in
-        Linux*)
-            programopener='vncviewer';
-            VNC_URL="localhost:$VNC_PORT_LOCAL";
-            echo "# [VNC App] 127.0.0.1:$VNC_PORT_LOCAL >>>> TUNNEL";
-            ;;
-        Darwin*)
-            programopener='open';
-            echo "# ScreenSharing.app 127.0.0.1:$VNC_PORT_LOCAL >>>> TUNNEL";
-            ;;
-        CYGWIN*)
-            errortxt="CYGWIN is not currently supported. You will have to open ";
-            errortxt+="your VNC client mannually to $VNC_URL ";
-            errortxt+="before the SSH Tunnel collapses.";
-            echo 1>&2 "$errortxt" && exit -1;
-            ;;
-        *)
-            echo 1>&2 "ERROR: Unsupported system type ($unameOut) detected. Quiting..." && exit -1;
-            ;;
-    esac
-    echo "${programopener} ${VNC_URL}";
-    bash -c "${programopener} ${VNC_URL}" 2>/dev/null;
-    [ $? != 0 ] && echo 1>&2 "There was an error opening your default VNC program." && exit -2;
+    i=0;
+    while [[ $i < $NUM_OF_DISPLAYS ]]; do
+        local VNC_URL="vnc://localhost:${VNC_PORTS_LOCAL[i]}";
+        spawn_vnc_client "$VNC_URL";
+        ((i++));
+    done
 
-    #      if [ -z "$(netstat -tln | grep "$VNC_PORT_LOCAL" )" ]; then              # alternative if
-    if [ -z "$(lsof -t -i @localhost:"$VNC_PORT_LOCAL" -sTCP:listen )" ]; then       #gets PID of listening process
-        echo "Error: Secure tunnel persistence failed. Exiting..."; exit 1;
-    fi
-
-    echo "Enter the VNC Access password in the popup.";
+    echo "Enter the VNC Access password in the $([[ $NUM_OF_DISPLAYS == 1 ]] && echo "popup" || echo "popups").";
     echo "";
-    #
     echo "Enjoy your VNC Desktop session!";
     echo "Once you exit, the secure tunnel will collapse in 30 seconds." && echo "";
 
 }
-
 
 
 # Process line args
