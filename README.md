@@ -89,6 +89,7 @@ $ ./bash/vnc-local
 ## [4] For VNC over WAN connections
 $ ./bash/vnc-remote
 ```
+[**CHECK OUT THE LATEST UPDATES HERE**](./CHANGELOG.md)
 
 ## SUPPORTED ENVIRONMENTAL VARIABLES
 If any of the following variables are defined when the script is run then the script will use those variables and not ask the user for input.
@@ -98,10 +99,10 @@ If any of the following variables are defined when the script is run then the sc
 - DEFAULT_rHOSTNAME -------- (local only) hostname
 - DEFAULT_SSH_PORT ---------- remote host port of ssh server (sshd.service)
 - DEFAULT_VNC_PORT_LOCAL -- base port to start at when port forwarding
-- DEFAULT_VNC_PORT ---------- remote base port to start at when requesting vnc connections
+- DEFAULT_NUM_OF_DISPLAYS - 1-4 remote desktops to spawn & connect to
 
 ## FUTURE GOALS & COMING SOON
-1. **[HELP REQUESTED]** Port over to Python & handle cross-platform to include Windows
+1. **[HELP REQUESTED]** Port over to Python & NodeJS & handle cross-platform to include Windows
 2. Plugin architecture for other vncserver applications
 3. Management ability to kill other displays (this will loose any unsaved work)
 
