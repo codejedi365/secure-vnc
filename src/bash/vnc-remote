@@ -5,7 +5,7 @@
 #     Secure Remote VNC Agent      #
 #                                  #
 # Author: codejedi365              #
-# Date:   27 Dec 2020              #
+# Date:   10 May 2021              #
 #----------------------------------#
 
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd )";   # source code location
