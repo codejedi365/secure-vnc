@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ----
 ## \[Unreleased]
 <!-- ### Added -->
-<!-- ### Changed -->
+### Changed
+- Interaction of setting remote hostname/IP address.  Reads & validates env variable and enables user to select default or change the ip on the spot rather than auto acceptance.
 ### Removed
 - Unnecessary and confusing tab completion (shell emulation) when asking for user input when it is not relevant to filesystem
 <!-- ### Fixed -->

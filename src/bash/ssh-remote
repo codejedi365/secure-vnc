@@ -5,7 +5,7 @@
 #      Remote SSH Login Agent      #
 #                                  #
 # Author: codejedi365              #
-# Date:   27 Dec 2020              #
+# Date:   10 May 2021              #
 #----------------------------------#
 
 # Interactive prompt
@@ -18,6 +18,9 @@
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd )";   # source code location
 WRK_DIR="$PWD";                                             # current location user is
 [ -f "$WRK_DIR/users" ] && . "$WRK_DIR"/users || USERS=()              #include users list
+
+[ -n "$REMOTE_ADDRESS" -a -z "$DEFAULT_REMOTE_ADDRESS" ] && DEFAULT_REMOTE_ADDRESS="$REMOTE_ADDRESS"
+unset REMOTE_ADDRESS
 
 # Default Vars
 [ -z "$DEFAULT_SSH_PORT" ] && DEFAULT_SSH_PORT=22;
@@ -35,7 +38,8 @@ help() {
     echo "----------------------"
     echo "Interactive SSH connection initializer to remote IPv4 device"
     echo ""
-    usage | echo;
+    (usage)
+	echo ""
     echo "Available Options: "
     echo "  -h  Help"
     echo "  -a  Destination IPv4 address"
@@ -61,17 +65,28 @@ print_banner() {
 
 interact() {
 	
+	test_ipaddr() {
+		[ -n "$(grep -E '^(([0-9]{1,3}\.){3}[0-9]{1,3})$' <(echo "$1"))" ] && return 0 || return 1;
+	}
+	local prompt="Remote IPv4 Address"
+	if test_ipaddr "$DEFAULT_REMOTE_ADDRESS"; then
+		prompt="${prompt} [$DEFAULT_REMOTE_ADDRESS]"
+	else
+		unset DEFAULT_REMOTE_ADDRESS
+	fi
     while [ -z "$REMOTE_ADDRESS" ]; do
-        read -e -p "Remote IPv4 Address: " dest;
-        if [ -z "$dest" ]; then
+        read -p "${prompt}: " dest;
+		if [ -z "$dest" ] && [ -n "$DEFAULT_REMOTE_ADDRESS" ]; then
+			dest="$DEFAULT_REMOTE_ADDRESS"
+        elif [ -z "$dest" ]; then
             continue
-        elif [ -z "$(grep -E '^(([0-9]{1,3}\.){3}[0-9]{1,3})$' <(echo "$dest"))" ]; then		# Check if address matches an IPv4 address
+        elif ! test_ipaddr "$dest"; then		# Check if address matches an IPv4 address
             echo 1>&2 "Invalid input. Expected an IPv4 address. Please try again."
-        else
-            export REMOTE_ADDRESS="$dest";
-            echo "ADDRESS=$REMOTE_ADDRESS"
+			continue
         fi
+        export REMOTE_ADDRESS="$dest";
     done
+	echo "ADDRESS=$REMOTE_ADDRESS"
 	
 }
 
