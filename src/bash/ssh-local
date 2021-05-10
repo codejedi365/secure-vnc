@@ -5,7 +5,7 @@
 #      Local SSH Login Agent       #
 #                                  #
 # Author: codejedi365              #
-# Date:   27 Dec 2020              #
+# Date:   10 May 2021              #
 #----------------------------------#
 
 # Interactive prompt
@@ -66,7 +66,7 @@ interact() {
         local dest=""
         DEFAULT_PROMPT=`[ -n "$DEFAULT_rHOSTNAME" ] && echo " [$DEFAULT_rHOSTNAME]" || echo ""`
         while [ "$valid" = false ]; do
-            read -e -p "Hostname/IPv4 Address${DEFAULT_PROMPT}: " dest;
+            read -p "Hostname/IPv4 Address${DEFAULT_PROMPT}: " dest;
             
             if [ -n "$(grep -E '^([A-Za-z0-9_-]+[A-Za-z0-9])(\.local)?$' <(echo "$dest"))" ]; then			# Check if address matches a HOSTNAME
                 [ -z "$(grep -E '(\.local)$' <(echo "$dest"))" ] && dest="$dest.local";

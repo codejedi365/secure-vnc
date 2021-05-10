@@ -5,7 +5,7 @@
 #      SSH Connect Syntax          #
 #                                  #
 # Author: codejedi365              #
-# Date:   27 Dec 2020              #
+# Date:   10 May 2021              #
 #----------------------------------#
 
 # Interactive prompt
@@ -89,7 +89,7 @@ interact_ssh() {
 
 	if [ -z "$SSH_PORT" ]; then
 		if [ "$MODE_LAZY" = false ]; then
-			read -e -p "Remote service port [$DEFAULT_SSH_PORT]: " port;
+			read -p "Remote service port [$DEFAULT_SSH_PORT]: " port;
 		fi
 		if [ -n "$port" ] && [[ $port > 0 ]] && [[ $port < 65536 ]]; then
 			SSH_PORT="$port"
@@ -102,7 +102,7 @@ interact_ssh() {
 	if [ -z "$SSH_USERNAME" ]; then
 		if [ "$MODE_LAZY" = false ]; then
 			print_users
-			read -e -p "Username on remote [$DEFAULT_USER]: " user;
+			read -p "Username on remote [$DEFAULT_USER]: " user;
 		fi
 		if [ -n "$user" -a "$(check_user "$user")" = true ]; then
 			SSH_USERNAME="$user"
@@ -117,7 +117,7 @@ interact_ssh() {
         echo "Found identity key: ~/.ssh/$SSH_USERNAME"
         local confirmed=false
         while [ "$confirmed" = false ]; do
-            read -e -p "Do you want to use this key pair (Y/n)? " response;
+            read -p "Do you want to use this key pair (Y/n)? " response;
             if [ -n "$(echo $response | grep -i -E '^(Y|YES|YEP|N|NO|NOPE)$')" ]; then
                 if [ -n "$(echo $response | grep -i -E '^(N|NO|NOPE)$')" ]; then
                     IDENTITY_KEY=""     # reset key
@@ -209,7 +209,7 @@ main() {
     echo -e "> ssh $SSH_USERNAME@$REMOTE_ADDRESS -p $SSH_PORT -i $IDENTITY_KEY\n";
     local confirmed=false
     while [ "$confirmed" = false ]; do
-        read -e -p "Are you ready to connect (Y/n)? " response;
+        read -p "Are you ready to connect (Y/n)? " response;
         if [ -n "$(echo $response | grep -i -E '^(Y|YES|YEP|N|NO|NOPE)$')" ]; then
             if [ -n "$(echo $response | grep -i -E '^(N|NO|NOPE)$')" ]; then
                 echo 1>&2 "Aborted connection." && exit 0;

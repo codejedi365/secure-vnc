@@ -5,7 +5,7 @@
 #     Secure VNC Connect Agent     #
 #                                  #
 # Author: codejedi365              #
-# Date:   28 Dec 2020              #
+# Date:   10 May 2021              #
 #----------------------------------#
 # DESCRIPTION:
 # Interactive prompt
@@ -100,7 +100,7 @@ get_connection_type() {
 		if [ "$MODE_LAZY" == false ]; then
 			local valid=false
 			while [ "$valid" == false ]; do
-				read -e -p "Connection type (REMOTE/LOCAL) [$DEFAULT_CONNECT_TYPE]: " CONN_TYPE;
+				read -p "Connection type (REMOTE/LOCAL) [$DEFAULT_CONNECT_TYPE]: " CONN_TYPE;
 				if [ -n "$CONN_TYPE" -a [ -n "$(grep -i -E '^(remote|R|local|L)$' <(echo "$CONN_TYPE"))"] ]; then
 					valid=true
 					[ -n "$(grep -i -E '^(R|remote)$' <(echo "$CONN_TYPE"))" ] && CONN_TYPE="REMOTE";
@@ -127,7 +127,7 @@ interact_vnc() {
             echo "the remote host.  Please provide the local base port to start from below.";
             echo "  ex: LOCAL_PORT = BASE_PORT + DISPLAY_NUMBER";
             echo;
-            read -e -p "VNC Client-Side Port (base) [$DEFAULT_VNC_PORT_LOCAL]: " lport;
+            read -p "VNC Client-Side Port (base) [$DEFAULT_VNC_PORT_LOCAL]: " lport;
         fi
 
         if [ -z "$(grep -E '^6[0-5]{2}[1-3][1-5]|([1-5]?[0-9]{4})|([0-9]{1,4})$' <(echo "$lport"))" ]; then        # Check for number less than 65535
@@ -142,7 +142,7 @@ interact_vnc() {
     #         echo "If the remote host's VNC server has a different base port configured, enter it";
     #         echo "here. VNC's default is 5900, meaning display :1 will be on port 5901.";
     #         echo;
-    #         read -e -p "Remote VNC Server Port (base) [$DEFAULT_VNC_PORT]: " Rport;
+    #         read -p "Remote VNC Server Port (base) [$DEFAULT_VNC_PORT]: " Rport;
     #     fi
 
     #     if [ -z "$(grep -E '^6[0-5]{2}[1-3][1-5]|([1-5]?[0-9]{4})|([0-9]{1,4})$' <(echo "$Rport"))" ]; then        # Check for number less than 65535
@@ -159,7 +159,7 @@ interact_vnc() {
             echo "the appearance of dual screens or more over VNC. Multiple ports will be forwarded.";
             echo "Limit between 1 to 4.";
             echo;
-            read -e -p "How many displays would you like [$DEFAULT_NUM_OF_DISPLAYS]? " display_count;
+            read -p "How many displays would you like [$DEFAULT_NUM_OF_DISPLAYS]? " display_count;
         fi
         if [ -z "$(echo $display_count | grep -E '^[ ]*[1-4][ ]*$')" ]; then
             display_count=$DEFAULT_NUM_OF_DISPLAYS;
@@ -284,7 +284,7 @@ main() {
     echo -e "> ssh $SSH_USERNAME@$REMOTE_ADDRESS -p $SSH_PORT -i $IDENTITY_KEY\n";
     local confirmed=false
     while [ "$confirmed" == false ]; do
-        read -e -p "Are you ready to connect (Y/n)? " response;
+        read -p "Are you ready to connect (Y/n)? " response;
         if [ -n "$(echo $response | grep -i -E '^(Y|YES|YEP|N|NO|NOPE)$')" ]; then
             if [ -n "$(echo $response | grep -i -E '^(N|NO|NOPE)$')" ]; then
                 echo 1>&2 "Aborted connection." && exit 0;
@@ -357,7 +357,7 @@ main() {
 
             confirmed=false;
             while [ "$confirmed" == false ]; do
-                read -e -p "Which session do you want to resume (${opts_str}) or create new (n)? " answer;
+                read -p "Which session do you want to resume (${opts_str}) or create new (n)? " answer;
                 if [ -n "$(echo $answer | grep -i -E "^(${opts_regex}|N|NEW)\$")" ]; then        # Check if valid entry
                     if [ -n "$(echo $answer | grep -i -E '^(N|NEW)$')" ]; then
                         echo -e "[CONFIRMED] Spawning a new desktop session...\n";
@@ -391,7 +391,7 @@ main() {
             user_asked=false;
         fi
         while [ "$confirmed" == false ]; do
-            read -e -p "Do you want to resume your session (Y/n)? " answer;
+            read -p "Do you want to resume your session (Y/n)? " answer;
             if [ -n "$(echo $answer | grep -i -E '^(Y|YES|YEP|N|NO|NOPE)$')" ]; then
                 if [ -n "$(echo $answer | grep -i -E '^(N|NO|NOPE)$')" ]; then
                     decision="new";
