@@ -19,6 +19,10 @@ SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd )";   # source code locati
 WRK_DIR="$PWD";                                             # current location user is
 [ -f "$WRK_DIR/users" ] && . "$WRK_DIR"/users || USERS=()              #include users list
 
+## Prevent Env pollution
+[ -n "$REMOTE_ADDRESS" -a -z "$DEFAULT_rHOSTNAME" ] && DEFAULT_rHOSTNAME="$REMOTE_ADDRESS"
+unset REMOTE_ADDRESS
+
 # Default Vars
 [ -z "$DEFAULT_SSH_PORT" ] && DEFAULT_SSH_PORT=22;
 [ -n "$DEFAULT_rHOSTNAME" ] && [ -z "$(grep -E '(\.local)$' <(echo "$DEFAULT_rHOSTNAME"))" ] && DEFAULT_rHOSTNAME="${DEFAULT_rHOSTNAME}.local";
@@ -61,35 +65,42 @@ print_banner() {
 
 interact() {
 
+	test_ipaddr() {
+		[ -n "$(grep -E '^(([0-9]{1,3}\.){3}[0-9]{1,3})$' <(echo "$1"))" ] && return 0 || return 1;
+	}
+	test_FQDN() {
+		[ -n "$(grep -E '^([A-Za-z0-9_-]+[A-Za-z0-9])(\.local)?$' <(echo "$1"))" ] && return 0 || return 1;
+	}
+
     if [ -z "$REMOTE_ADDRESS" ] && [ "$MODE_LAZY" = false ]; then
-        local valid=false
         local dest=""
-        DEFAULT_PROMPT=`[ -n "$DEFAULT_rHOSTNAME" ] && echo " [$DEFAULT_rHOSTNAME]" || echo ""`
-        while [ "$valid" = false ]; do
-            read -p "Hostname/IPv4 Address${DEFAULT_PROMPT}: " dest;
-            
-            if [ -n "$(grep -E '^([A-Za-z0-9_-]+[A-Za-z0-9])(\.local)?$' <(echo "$dest"))" ]; then			# Check if address matches a HOSTNAME
-                [ -z "$(grep -E '(\.local)$' <(echo "$dest"))" ] && dest="$dest.local";
-                valid=true
+		local prompt="Hostname/IPv4 Address"
+		if test_ipaddr "$DEFAULT_rHOSTNAME" || test_FQDN "$DEFAULT_rHOSTNAME"; then
+        	prompt="${prompt} [$DEFAULT_rHOSTNAME]"
+		else
+			unset DEFAULT_rHOSTNAME
+		fi
+        while [ -z "$REMOTE_ADDRESS" ]; do
+            read -p "${prompt}: " dest;
 
-            elif [ -n "$(grep -E '^(([0-9]{1,3}\.){3}[0-9]{1,3})$' <(echo "$dest"))" ]; then		# Check if address matches an IPv4 address
-                valid=true
-
-            elif [ -z "$dest" ] && [ -n "$DEFAULT_rHOSTNAME" ]; then # empty input when there is a default
+            if [ -z "$dest" ] && [ -n "$DEFAULT_rHOSTNAME" ]; then # empty input when there is a default
                 dest=$DEFAULT_rHOSTNAME
-                valid=true
             
             elif [ -z "$dest" ]; then       # empty input when there is NOT a default
                 continue
 
-            else
+            elif ! test_FQDN "$dest" && ! test_ipaddr "$dest"; then
                 echo 1>&2 "Invalid Input received. Please enter either a hostname or an IPv4 address.";
-            fi
-        done
-        export REMOTE_ADDRESS="$dest";
-        echo "ADDRESS=$REMOTE_ADDRESS"
-    fi
-	
+				continue
+
+			elif test_FQDN "$dest" && [ -z "$(grep -E '(\.local)$' <(echo "$dest"))" ]; then
+				dest="$dest.local";
+
+			fi
+			export REMOTE_ADDRESS="$dest";
+		done
+	fi
+	echo "ADDRESS=$REMOTE_ADDRESS"
 }
 
 # Required env vars
